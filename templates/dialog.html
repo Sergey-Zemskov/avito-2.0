@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Переписка с {{ other.login }}{% endblock %}
+
+{% block content %}
+
+<h1>Переписка с {{ other.login }}</h1>
+
+{% if msgs %}
+<table class="list">
+    <tr>
+        <th style="width: 150px">От кого</th>
+        <th>Сообщение</th>
+        <th style="width: 160px">Дата</th>
+    </tr>
+    {% for m in msgs %}
+    <tr>
+        <td>{{ m.login }}</td>
+        <td>{{ m.message_text }}</td>
+        <td class="small">{{ m.created_at }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<div class="empty">
+    Сообщений пока нет. Напишите первым.
+</div>
+{% endif %}
+
+<form class="box" method="post">
+    <label for="text">Новое сообщение</label>
+    <p><textarea id="text" name="text" rows="4" cols="60"></textarea></p>
+    <p><input type="submit" value="Отправить"></p>
+</form>
+
+<p><a href="/messages">Назад к списку переписок</a></p>
+
+{% endblock %}

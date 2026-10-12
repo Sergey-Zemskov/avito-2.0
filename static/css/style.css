@@ -1,0 +1,286 @@
+/* Оформление сайта объявлений "Авито".
+   Курсовая работа. Цвета только чёрный, белый и оттенки серого. */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    color: #000000;
+    background-color: #ececec;
+}
+
+.wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+/* --- Шапка сайта --- */
+
+.topbar {
+    background-color: #000000;
+    color: #ffffff;
+    padding: 10px 0;
+}
+
+.topbar .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.topbar .who {
+    font-size: 14px;
+}
+
+.topbar a {
+    color: #ffffff;
+}
+
+/* --- Строка меню --- */
+
+.navbar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #000000;
+}
+
+.navbar .wrap {
+    padding-top: 9px;
+    padding-bottom: 9px;
+}
+
+.navbar a {
+    color: #000000;
+    text-decoration: none;
+    margin-right: 18px;
+}
+
+.navbar a:hover {
+    text-decoration: underline;
+}
+
+/* --- Основная часть страницы --- */
+
+main {
+    padding: 20px 0 30px;
+}
+
+h1 {
+    font-size: 24px;
+    margin: 0 0 15px;
+}
+
+h2 {
+    font-size: 20px;
+    margin: 0 0 15px;
+}
+
+h3 {
+    font-size: 16px;
+    margin: 20px 0 10px;
+}
+
+.box {
+    background-color: #ffffff;
+    border: 1px solid #999999;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+/* --- Таблица объявлений --- */
+
+table.list {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #ffffff;
+    margin-bottom: 20px;
+}
+
+table.list th,
+table.list td {
+    border: 1px solid #999999;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+table.list th {
+    background-color: #dddddd;
+    font-size: 14px;
+}
+
+table.list tr:nth-child(even) td {
+    background-color: #f6f6f6;
+}
+
+table.list tr:hover td {
+    background-color: #e8e8e8;
+}
+
+table.list img {
+    border: none;
+}
+
+/* --- Ссылки --- */
+
+a {
+    color: #000000;
+}
+
+a:hover {
+    color: #555555;
+}
+
+/* --- Поля ввода и кнопки --- */
+
+label {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 3px;
+}
+
+input[type="text"],
+input[type="password"],
+select,
+textarea {
+    font-family: inherit;
+    font-size: 15px;
+    padding: 6px 8px;
+    border: 1px solid #888888;
+    background-color: #ffffff;
+    color: #000000;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+select:focus,
+textarea:focus {
+    border-color: #000000;
+    outline: none;
+}
+
+input[type="submit"] {
+    font-family: inherit;
+    font-size: 15px;
+    padding: 7px 18px;
+    border: 1px solid #000000;
+    background-color: #ffffff;
+    color: #000000;
+    cursor: pointer;
+}
+
+input[type="submit"]:hover {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+.filter .field {
+    display: inline-block;
+    margin-right: 15px;
+    vertical-align: bottom;
+}
+
+.filter input[type="submit"] {
+    vertical-align: bottom;
+}
+
+/* --- Сообщения о действиях --- */
+
+.messages {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px;
+}
+
+.messages li {
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    border-left: 5px solid #000000;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+}
+
+/* --- Карточка объявления --- */
+
+.photo {
+    background-color: #ffffff;
+    border: 1px solid #999999;
+    padding: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.price {
+    font-size: 22px;
+    font-weight: bold;
+    margin: 0 0 15px;
+}
+
+.fields {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px;
+}
+
+.fields li {
+    padding: 7px 0;
+    border-bottom: 1px solid #dddddd;
+}
+
+.fields li span {
+    display: inline-block;
+    width: 150px;
+    color: #555555;
+}
+
+.actions {
+    padding-top: 5px;
+}
+
+.actions a {
+    margin-right: 15px;
+}
+
+/* --- Подвал --- */
+
+footer {
+    background-color: #ffffff;
+    border-top: 1px solid #999999;
+    color: #555555;
+    font-size: 13px;
+    padding: 15px 0;
+}
+
+/* --- Мелочи --- */
+
+.narrow {
+    max-width: 420px;
+}
+
+.muted {
+    color: #666666;
+}
+
+.small {
+    font-size: 13px;
+}
+
+.empty {
+    background-color: #ffffff;
+    border: 1px solid #999999;
+    padding: 30px;
+    text-align: center;
+    color: #555555;
+}

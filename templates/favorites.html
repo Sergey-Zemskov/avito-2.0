@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Избранное{% endblock %}
+
+{% block content %}
+
+<h1>Избранные объявления</h1>
+
+{% if ads %}
+<table class="list">
+    <tr>
+        <th>Название</th>
+        <th>Цена</th>
+        <th>Город</th>
+    </tr>
+    {% for ad in ads %}
+    <tr>
+        <td><a href="/ad/{{ ad.id }}">{{ ad.title }}</a></td>
+        <td>{{ ad.price }} руб.</td>
+        <td>{{ ad.city }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<div class="empty">
+    В избранном пока ничего нет.
+</div>
+{% endif %}
+
+{% endblock %}

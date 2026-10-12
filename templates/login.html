@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Вход на сайт{% endblock %}
+
+{% block content %}
+
+<h1>Вход на сайт</h1>
+
+<form class="box narrow" method="post">
+    <p>
+        <label for="login">Логин</label>
+        <input type="text" id="login" name="login" size="30">
+    </p>
+    <p>
+        <label for="password">Пароль</label>
+        <input type="password" id="password" name="password" size="30">
+    </p>
+    <p>
+        <input type="submit" value="Войти">
+    </p>
+</form>
+
+<p>Нет учётной записи? <a href="/register">Зарегистрируйтесь</a>.</p>
+
+<p class="muted small">
+    Тестовые пользователи: <b>admin / admin</b>, <b>ivan / 12345</b>.
+</p>
+
+{% endblock %}

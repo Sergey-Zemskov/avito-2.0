@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}{% if ad %}Редактирование объявления{% else %}Новое объявление{% endif %}{% endblock %}
+
+{% block content %}
+
+<h1>{% if ad %}Редактирование объявления{% else %}Новое объявление{% endif %}</h1>
+
+<form class="box" method="post" enctype="multipart/form-data">
+
+    <p>
+        <label for="title">Название</label>
+        <input type="text" id="title" name="title" size="60" value="{{ ad.get('title') or '' }}">
+    </p>
+
+    <p>
+        <label for="description">Описание</label>
+        <textarea id="description" name="description" rows="6" cols="60">{{ ad.get('description') or '' }}</textarea>
+    </p>
+
+    <p>
+        <label for="price">Цена, руб.</label>
+        <input type="text" id="price" name="price" size="20" value="{{ ad.get('price') or '' }}">
+    </p>
+
+    <p>
+        <label for="city">Город</label>
+        <input type="text" id="city" name="city" size="30" value="{{ ad.get('city') or '' }}">
+    </p>
+
+    <p>
+        <label for="category_id">Категория</label>
+        <select id="category_id" name="category_id">
+            {% for c in categories %}
+                <option value="{{ c.id }}"
+                    {% if ad.get('category_id') == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+    </p>
+
+    <p>
+        <label for="photo">Фотография</label>
+        <input type="file" id="photo" name="photo">
+    </p>
+
+    {% if ad and ad.get('image_url') %}
+        <p>
+            <span class="muted small">Сейчас загружено:</span><br>
+            <img src="/static/{{ ad.get('image_url') }}" width="200">
+        </p>
+    {% endif %}
+
+    <p>
+        <input type="submit" value="Сохранить">
+    </p>
+
+</form>
+
+<p><a href="/">Назад к списку объявлений</a></p>
+
+{% endblock %}
