@@ -411,13 +411,22 @@ def logout():
 if __name__ == "__main__":
     ok, error = db.ping(retries=1)
     if not ok:
-        print("Нет связи с базой данных")
-        print("Путь к базе:", config.DB_PATH)
-        print("Ошибка:", error)
-        print("Проверьте, что служба Firebird/RedDatabase запущена.")
+        print()
+        print("НЕТ СВЯЗИ С БАЗОЙ ДАННЫХ")
+        print("  Файл базы: %s" % config.DB_PATH)
+        print("  Ошибка   : %s" % error)
+        print()
+        print(config.firebird_help())
         raise SystemExit(1)
 
-    print("Сайт запущен: http://%s:%d" % (config.WEB_HOST, config.WEB_PORT))
-    print("Администратор: admin / admin")
+    print()
+    print("=" * 60)
+    print("  Сайт объявлений «Авито»")
+    print("  Откройте в браузере: http://%s:%d" % (config.WEB_HOST,
+                                                  config.WEB_PORT))
+    print("  Вход: admin / admin")
+    print("  Остановить сервер: Ctrl+C")
+    print("=" * 60)
+    print()
     app.run(host=config.WEB_HOST, port=config.WEB_PORT,
             debug=config.DEBUG, use_reloader=False)

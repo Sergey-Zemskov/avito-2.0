@@ -1,0 +1,17 @@
+# Правила переводов строк, чтобы проект одинаково работал
+# и на Windows, и на Linux.
+
+* text=auto
+
+# Скрипты Linux - переводы строк LF, иначе файл не запустится
+*.sh   text eol=lf
+
+# Файлы Windows - переводы строк CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Картинки - двоичные файлы, их не преобразуем
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.gif  binary

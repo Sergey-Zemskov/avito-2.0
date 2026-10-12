@@ -92,15 +92,21 @@ def database_exists():
 
 def remove_database():
     """Удаляет файл базы данных (используется только с ключом --reset)."""
-    if os.path.isfile(config.DB_PATH):
+    if not os.path.isfile(config.DB_PATH):
+        return
+    try:
         os.remove(config.DB_PATH)
         print("  старый файл базы удалён")
+    except OSError:
+        print("  не удалось удалить файл базы: %s" % config.DB_PATH)
+        if os.name != "nt":
+            print("  попробуйте так:  sudo rm -f %s" % config.DB_PATH)
 
 
 def create_database():
     """Создаёт файл базы данных и базовые таблицы."""
     folder = os.path.dirname(config.DB_PATH)
-    if folder and not os.path.isdir(folder):
+    if folder and not os.path.isdir(folder) and os.name == "nt":
         os.makedirs(folder, exist_ok=True)
         print("  создана папка %s" % folder)
 
@@ -140,15 +146,17 @@ def main():
         remove_database()
 
     if database_exists():
-        print("База данных уже существует — структура будет только дополнена.")
+        print("База данных уже есть — структура будет только дополнена.")
     else:
         print("Создание базы данных...")
         try:
             create_database()
         except Exception as exc:
-            print("Не удалось создать базу данных: %s" % exc)
-            print("Проверьте, что служба Firebird/RedDatabase запущена "
-                  "и путь в config.py указан верно.")
+            print()
+            print("НЕ УДАЛОСЬ СОЗДАТЬ БАЗУ ДАННЫХ")
+            print("Причина: %s" % exc)
+            print()
+            print(config.firebird_help())
             return 1
 
     print()
