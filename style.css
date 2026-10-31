@@ -1,0 +1,247 @@
+/* Простое чёрно-белое оформление */
+
+body {
+    font-family: "Times New Roman", Times, serif;
+    background: #ffffff;
+    color: #000000;
+    margin: 0;
+    padding: 0;
+    font-size: 16px;
+}
+
+/* ---------- Шапка ---------- */
+header {
+    background: #ffffff;
+    border-bottom: 2px solid #000000;
+    padding: 10px 20px;
+}
+
+header h1 {
+    margin: 0 0 5px 0;
+    font-size: 22px;
+}
+
+nav {
+    margin-top: 5px;
+}
+
+nav a {
+    color: #000000;
+    text-decoration: underline;
+    margin-right: 15px;
+    font-size: 14px;
+}
+
+nav a:hover {
+    color: #555555;
+}
+
+/* ---------- Основной блок ---------- */
+main {
+    max-width: 1000px;
+    margin: 15px auto;
+    padding: 0 15px;
+}
+
+h2 {
+    font-size: 20px;
+    border-bottom: 1px solid #000000;
+    padding-bottom: 3px;
+    margin-top: 25px;
+}
+
+/* ---------- Флеш-сообщения ---------- */
+.flashes {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.flashes li {
+    border: 1px solid #000000;
+    padding: 5px 10px;
+    margin-bottom: 5px;
+    background: #f2f2f2;
+}
+
+/* ---------- Формы ---------- */
+form {
+    border: 1px solid #000000;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: #ffffff;
+    max-width: 450px;
+}
+
+form label {
+    display: block;
+    margin: 8px 0 3px 0;
+    font-size: 14px;
+}
+
+form input,
+form select,
+form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 6px;
+    border: 1px solid #000000;
+    background: #ffffff;
+    color: #000000;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 14px;
+}
+
+form button {
+    margin-top: 10px;
+    padding: 5px 15px;
+    background: #ffffff;
+    color: #000000;
+    border: 1px solid #000000;
+    cursor: pointer;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 14px;
+}
+
+form button:hover {
+    background: #e0e0e0;
+}
+
+/* ---------- Поиск ---------- */
+.search-bar {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    border: none;
+    padding: 0;
+    margin-bottom: 10px;
+    max-width: none;
+    background: transparent;
+}
+
+.search-bar input,
+.search-bar select {
+    width: auto;
+    padding: 4px 6px;
+    border: 1px solid #000000;
+    background: #ffffff;
+    color: #000000;
+    font-size: 14px;
+}
+
+.search-bar button {
+    margin: 0;
+    padding: 4px 12px;
+    border: 1px solid #000000;
+    background: #ffffff;
+    color: #000000;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.search-bar button:hover {
+    background: #e0e0e0;
+}
+
+/* ---------- Таблица ---------- */
+.ads-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    margin-bottom: 20px;
+}
+
+.ads-table th,
+.ads-table td {
+    border: 1px solid #000000;
+    padding: 6px 8px;
+    text-align: left;
+    font-size: 14px;
+}
+
+.ads-table th {
+    background: #e6e6e6;
+    font-weight: bold;
+}
+
+/* ---------- Карточка объявления ---------- */
+.ad-card {
+    border: 1px solid #000000;
+    padding: 15px;
+    margin-bottom: 15px;
+    background: #ffffff;
+}
+
+.ad-card .price {
+    font-weight: bold;
+    font-size: 18px;
+    color: #000000;
+}
+
+.ad-image img {
+    max-width: 100%;
+    border: 1px solid #000000;
+}
+
+/* ---------- Кнопки действий ---------- */
+.actions {
+    margin-top: 10px;
+}
+
+.actions form {
+    display: inline-block;
+    border: none;
+    padding: 0;
+    margin: 0 10px 0 0;
+    max-width: none;
+    background: transparent;
+}
+
+.actions button,
+.btn {
+    display: inline-block;
+    padding: 5px 15px;
+    background: #ffffff;
+    color: #000000;
+    border: 1px solid #000000;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 14px;
+}
+
+.actions button:hover,
+.btn:hover {
+    background: #e0e0e0;
+}
+
+/* ---------- Сообщения ---------- */
+.messages-list {
+    margin-bottom: 15px;
+}
+
+.message {
+    border: 1px solid #000000;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    background: #ffffff;
+}
+
+.message.sent {
+    background: #f2f2f2;
+}
+
+/* ---------- Вспомогательные ---------- */
+.muted {
+    color: #555555;
+    font-size: 13px;
+}
+
+/* ---------- Подвал ---------- */
+footer {
+    border-top: 2px solid #000000;
+    margin-top: 30px;
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+}

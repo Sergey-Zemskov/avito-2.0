@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авито</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <h1>Авито</h1>
+    <nav>
+        <a href="/">Главная</a>
+        <a href="/add_ad">Добавить объявление</a>
+        <a href="/favorites">Избранное</a>
+        <a href="/messages">Сообщения</a>
+        <a href="/profile">Профиль</a>
+        <a href="/login">Войти</a>
+        <a href="/register">Регистрация</a>
+        <a href="/logout">Выйти</a>
+    </nav>
+</header>
+
+<main>
+
+    <ul class="flashes">
+        <!-- {% for message in get_flashed_messages() %} -->
+        <!--     <li>{{ message }}</li> -->
+        <!-- {% endfor %} -->
+    </ul>
+
+    <!-- ============ INDEX ============ -->
+    <section id="index">
+        <h2>Объявления</h2>
+
+        <form class="search-bar" method="get" action="/">
+            <input type="text" name="q" placeholder="Поиск по названию">
+            <select name="category">
+                <option value="">все категории</option>
+                <!-- {% for c in categories %} -->
+                <!--     <option value="{{ c.id }}">{{ c.name }}</option> -->
+                <!-- {% endfor %} -->
+            </select>
+            <button type="submit">Найти</button>
+        </form>
+
+        <table class="ads-table">
+            <thead>
+                <tr>
+                    <th>Фотография</th>
+                    <th>Название</th>
+                    <th>Цена</th>
+                    <th>Город</th>
+                    <th>Категория</th>
+                    <th>Продавец</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- {% for ad in ads %} -->
+                <!-- <tr> -->
+                <!--     <td>{% if ad.image_url %}<img src="{{ ad.image_url }}" width="100">{% else %}нет фото{% endif %}</td> -->
+                <!--     <td><a href="/ad/{{ ad.id }}">{{ ad.title }}</a></td> -->
+                <!--     <td>{{ ad.price }} руб.</td> -->
+                <!--     <td>{{ ad.city }}</td> -->
+                <!--     <td>{{ ad.category_name }}</td> -->
+                <!--     <td>{{ ad.seller }}</td> -->
+                <!-- </tr> -->
+                <!-- {% endfor %} -->
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ============ LOGIN ============ -->
+    <section id="login">
+        <h2>Вход</h2>
+        <form method="post" action="/login">
+            <label>Логин</label>
+            <input type="text" name="login" required>
+
+            <label>Пароль</label>
+            <input type="password" name="password" required>
+
+            <button type="submit">Войти</button>
+        </form>
+    </section>
+
+    <!-- ============ REGISTER (только логин и пароль) ============ -->
+    <section id="register">
+        <h2>Регистрация</h2>
+        <form method="post" action="/register">
+            <label>Логин</label>
+            <input type="text" name="login" required>
+
+            <label>Пароль</label>
+            <input type="password" name="password" required>
+
+            <button type="submit">Зарегистрироваться</button>
+        </form>
+    </section>
+
+    <!-- ============ ADD AD ============ -->
+    <section id="add_ad">
+        <h2>Добавить объявление</h2>
+        <form method="post" action="/add_ad" enctype="multipart/form-data">
+            <label>Название</label>
+            <input type="text" name="title" required maxlength="200">
+
+            <label>Описание</label>
+            <textarea name="description" rows="5"></textarea>
+
+            <label>Цена (руб.)</label>
+            <input type="number" name="price" step="0.01" required>
+
+            <label>Город</label>
+            <input type="text" name="city">
+
+            <label>Категория</label>
+            <select name="category_id">
+                <option value="">— выберите —</option>
+                <!-- {% for c in categories %} -->
+                <!--     <option value="{{ c.id }}">{{ c.name }}</option> -->
+                <!-- {% endfor %} -->
+            </select>
+
+            <label>Фотография</label>
+            <input type="file" name="image" accept="image/*">
+
+            <button type="submit">Опубликовать</button>
+        </form>
+    </section>
+
+    <!-- ============ AD DETAIL ============ -->
+    <section id="ad_detail">
+        <h2><!-- {{ ad.title }} --></h2>
+        <div class="ad-card">
+            <div class="ad-image">
+                <!-- {% if ad.image_url %}<img src="{{ ad.image_url }}" alt="{{ ad.title }}">{% else %}нет фото{% endif %} -->
+            </div>
+            <p class="price"><!-- {{ ad.price }} --> руб.</p>
+            <p><strong>Город:</strong> <!-- {{ ad.city }} --></p>
+            <p><strong>Категория:</strong> <!-- {{ ad.category_name }} --></p>
+            <p><strong>Продавец:</strong> <!-- {{ ad.seller }} --></p>
+            <p><strong>Описание:</strong> <!-- {{ ad.description }} --></p>
+            <p class="muted">Опубликовано: <!-- {{ ad.created_at }} --> · Просмотров: <!-- {{ ad.views_count }} --></p>
+        </div>
+        <div class="actions">
+            <form method="post" action="/favorites/add">
+                <input type="hidden" name="ad_id" value="<!-- {{ ad.id }} -->">
+                <button type="submit">В избранное</button>
+            </form>
+            <a href="/messages" class="btn">Написать продавцу</a>
+        </div>
+    </section>
+
+    <!-- ============ FAVORITES ============ -->
+    <section id="favorites">
+        <h2>Избранное</h2>
+        <table class="ads-table">
+            <thead>
+                <tr>
+                    <th>Фото</th>
+                    <th>Название</th>
+                    <th>Цена</th>
+                    <th>Город</th>
+                    <th>Дата</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- {% for f in favorites %} -->
+                <!-- <tr> -->
+                <!--     <td>нет фото</td> -->
+                <!--     <td><a href="/ad/{{ f.ad_id }}">{{ f.title }}</a></td> -->
+                <!--     <td>{{ f.price }} руб.</td> -->
+                <!--     <td>{{ f.city }}</td> -->
+                <!--     <td>{{ f.created_at }}</td> -->
+                <!-- </tr> -->
+                <!-- {% endfor %} -->
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ============ MESSAGES ============ -->
+    <section id="messages">
+        <h2>Сообщения</h2>
+
+        <div class="messages-list">
+            <!-- {% for m in messages %} -->
+            <!-- <div class="message {% if m.sender_id == current_user.id %}sent{% endif %}"> -->
+            <!--     <strong>{{ m.sender }}:</strong> {{ m.body }}<br> -->
+            <!--     <span class="muted">{{ m.created_at }}</span> -->
+            <!-- </div> -->
+            <!-- {% endfor %} -->
+        </div>
+
+        <form method="post" action="/messages/send">
+            <label>Получатель</label>
+            <input type="text" name="receiver" required>
+
+            <label>Сообщение</label>
+            <textarea name="body" rows="3" required></textarea>
+
+            <button type="submit">Отправить</button>
+        </form>
+    </section>
+
+    <!-- ============ PROFILE (только логин) ============ -->
+    <section id="profile">
+        <h2>Профиль пользователя</h2>
+        <form method="post" action="/profile">
+            <label>Логин</label>
+            <input type="text" name="login" value="<!-- {{ user.login }} -->" readonly>
+
+            <label>Новый пароль</label>
+            <input type="password" name="password" placeholder="оставьте пустым, чтобы не менять">
+
+            <button type="submit">Сохранить</button>
+        </form>
+    </section>
+
+</main>
+
+<footer>
+    <p>Курсовая работа по базам данных. Сайт объявлений «Авито», 2026 год.</p>
+</footer>
+
+</body>
+</html>
