@@ -2,294 +2,216 @@ import fdb
 import hashlib
 import os
 
-# Настройки подключения к БД (замените под свои)
-DB_HOST = "localhost"
-DB_PATH = "/home/user/avito_db/AVITO.DB"
+DB_PATH = os.path.expanduser("~/avito_db/AVITO.DB")
 DB_USER = "sysdba"
 DB_PASSWORD = "masterkey"
 DB_CHARSET = "UTF8"
 
-
 def get_connection():
-    """Возвращает соединение с базой данных."""
     return fdb.connect(
-        host=DB_HOST,
-        database=DB_PATH,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        charset=DB_CHARSET
+        host="localhost", database=DB_PATH,
+        user=DB_USER, password=DB_PASSWORD, charset=DB_CHARSET
     )
 
-
-def get_next_id(cursor, table_name):
-    """Вспомогательная функция для получения следующего ID (так как в Firebird нет автоинкремента по умолчанию)."""
-    cursor.execute(f"SELECT MAX(id) FROM {table_name}")
-    row = cursor.fetchone()
-    if row[0] is None:
-        return 1
-    return row[0] + 1
-
-
-# ==========================================
-# 1. Регистрация и авторизация
-# ==========================================
-
+# --- Пользователи ---
 def register_user(login, password):
-    """Создает нового пользователя с хэшированным паролем."""
     conn = get_connection()
     cur = conn.cursor()
     try:
-        new_id = get_next_id(cur, "USERS")
-        # Хэшируем пароль перед сохранением (безопасность)
-        pwd_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-        
-        cur.execute(
-            "INSERT INTO USERS (ID, LOGIN, PASSWORD_HASH, ROLE) VALUES (?, ?, ?, ?)",
-            (new_id, login, pwd_hash, 'user')
-        )
+        pwd_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        # ID генерируется автоматически (IDENTITY)
+        cur.execute("INSERT INTO users (login, password_hash, role) VALUES (?, ?, 'user')", 
+                    (login, pwd_hash))
         conn.commit()
         return True
     except fdb.DatabaseError:
-        # Если логин уже существует (UNIQUE constraint)
-        return False
+        return False # Логин уже существует
     finally:
-        cur.close()
-        conn.close()
-
+        cur.close(); conn.close()
 
 def login_user(login, password):
-    """Проверяет логин и пароль. Возвращает ID пользователя, если вход успешен."""
     conn = get_connection()
     cur = conn.cursor()
-    try:
-        pwd_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-        cur.execute(
-            "SELECT ID FROM USERS WHERE LOGIN = ? AND PASSWORD_HASH = ?",
-            (login, pwd_hash)
-        )
-        row = cur.fetchone()
-        if row:
-            return row[0] # Возвращаем ID пользователя
-        return None
-    finally:
-        cur.close()
-        conn.close()
+    pwd_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    cur.execute("SELECT id, login FROM users WHERE login = ? AND password_hash = ?", (login, pwd_hash))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return row
 
+def get_user_by_id(user_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, login FROM users WHERE id = ?", (user_id,))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return row
 
-# ==========================================
-# 2. Просмотр, поиск, фильтрация и сортировка (Каталог)
-# ==========================================
-
+# --- Каталог ---
 def get_catalog(search_query="", category_id=None, city=None, sort_by="date"):
-    """Возвращает список объявлений с фильтрацией и сортировкой."""
     conn = get_connection()
     cur = conn.cursor()
-    
-    # Базовый запрос с JOIN для получения названия категории и логина продавца
     sql = """
-        SELECT a.ID, a.TITLE, a.PRICE, a.CITY, c.NAME as CATEGORY, u.LOGIN as SELLER
-        FROM ADS a
-        JOIN CATEGORIES c ON a.CATEGORY_ID = c.ID
-        JOIN USERS u ON a.USER_ID = u.ID
+        SELECT a.id, a.title, a.price, a.city, c.name, u.login
+        FROM ads a
+        JOIN categories c ON a.category_id = c.id
+        JOIN users u ON a.user_id = u.id
         WHERE 1=1
     """
     params = []
-
     if search_query:
-        sql += " AND a.TITLE LIKE ?"
+        sql += " AND a.title LIKE ?"
         params.append(f"%{search_query}%")
     if category_id:
-        sql += " AND a.CATEGORY_ID = ?"
+        sql += " AND a.category_id = ?"
         params.append(category_id)
     if city:
-        sql += " AND a.CITY = ?"
+        sql += " AND a.city = ?"
         params.append(city)
-
-    # Сортировка (по цене или по дате (ID))
-    if sort_by == "price":
-        sql += " ORDER BY a.PRICE ASC"
-    else:
-        sql += " ORDER BY a.ID DESC" # Сначала новые
-
+    
+    sql += " ORDER BY a.price ASC" if sort_by == "price" else " ORDER BY a.id DESC"
+    
     cur.execute(sql, params)
-    results = cur.fetchall()
-    cur.close()
-    conn.close()
-    return results
-
-
-def get_all_categories():
-    """Возвращает все категории для выпадающего списка фильтра."""
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT ID, NAME FROM CATEGORIES")
     rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    cur.close(); conn.close()
     return rows
 
+def get_all_categories():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM categories ORDER BY name")
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return rows
 
-# ==========================================
-# 3. Просмотр карточки объявления
-# ==========================================
-
+# --- Карточка ---
 def get_ad_details(ad_id):
-    """Возвращает полную информацию об объявлении (включая фото BLOB)."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT a.ID, a.TITLE, a.DESCRIPTION, a.PRICE, a.CITY, 
-               c.NAME as CATEGORY, u.LOGIN as SELLER, a.USER_ID, a.IMAGE
-        FROM ADS a
-        JOIN CATEGORIES c ON a.CATEGORY_ID = c.ID
-        JOIN USERS u ON a.USER_ID = u.ID
-        WHERE a.ID = ?
+        SELECT a.id, a.title, a.description, a.price, a.city,
+               c.name, u.login, a.user_id, a.category_id
+        FROM ads a
+        JOIN categories c ON a.category_id = c.id
+        JOIN users u ON a.user_id = u.id
+        WHERE a.id = ?
     """, (ad_id,))
     row = cur.fetchone()
-    cur.close()
-    conn.close()
+    cur.close(); conn.close()
     return row
 
+def get_ad_image(ad_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT image FROM ads WHERE id = ?", (ad_id,))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return row[0] if row else None
 
-# ==========================================
-# 4. Избранное
-# ==========================================
-
+# --- Избранное ---
 def add_to_favorites(user_id, ad_id):
-    """Добавляет объявление в избранное."""
     conn = get_connection()
     cur = conn.cursor()
     try:
-        new_id = get_next_id(cur, "FAVORITES")
-        cur.execute("INSERT INTO FAVORITES (ID, USER_ID, AD_ID) VALUES (?, ?, ?)", (new_id, user_id, ad_id))
+        cur.execute("INSERT INTO favorites (user_id, ad_id) VALUES (?, ?)", (user_id, ad_id))
         conn.commit()
         return True
     except fdb.DatabaseError:
-        return False # Уже добавлено
+        return False
     finally:
-        cur.close()
-        conn.close()
+        cur.close(); conn.close()
 
+def remove_from_favorites(user_id, ad_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM favorites WHERE user_id = ? AND ad_id = ?", (user_id, ad_id))
+    conn.commit()
+    cur.close(); conn.close()
 
 def get_favorites(user_id):
-    """Возвращает избранные объявления пользователя."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT a.ID, a.TITLE, a.PRICE, a.CITY
-        FROM FAVORITES f
-        JOIN ADS a ON f.AD_ID = a.ID
-        WHERE f.USER_ID = ?
+        SELECT a.id, a.title, a.price, a.city
+        FROM favorites f JOIN ads a ON f.ad_id = a.id
+        WHERE f.user_id = ? ORDER BY f.id DESC
     """, (user_id,))
     rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    cur.close(); conn.close()
     return rows
 
-
-# ==========================================
-# 5. Управление объявлениями (Добавление, Редактирование, Удаление)
-# ==========================================
-
-def create_ad(user_id, category_id, title, description, price, city, image_path=None):
-    """Создает новое объявление. Читает картинку как BLOB."""
-    image_data = None
-    if image_path and os.path.exists(image_path):
-        with open(image_path, "rb") as f:
-            image_data = f.read() # Читаем байты
-
+# --- Управление объявлениями ---
+def create_ad(user_id, category_id, title, description, price, city, image_data=None):
     conn = get_connection()
     cur = conn.cursor()
-    new_id = get_next_id(cur, "ADS")
     cur.execute("""
-        INSERT INTO ADS (ID, USER_ID, CATEGORY_ID, TITLE, DESCRIPTION, PRICE, CITY, IMAGE)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (new_id, user_id, category_id, title, description, price, city, image_data))
+        INSERT INTO ads (user_id, category_id, title, description, price, city, image)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, category_id, title, description, price, city, image_data))
     conn.commit()
-    cur.close()
-    conn.close()
-
-
-def update_ad(ad_id, user_id, title, description, price, city, category_id, image_path=None):
-    """Редактирует объявление (только если это владелец)."""
-    conn = get_connection()
-    cur = conn.cursor()
-    
-    # Проверка, что объявление принадлежит этому пользователю
-    cur.execute("SELECT USER_ID FROM ADS WHERE ID = ?", (ad_id,))
-    owner = cur.fetchone()
-    if not owner or owner[0] != user_id:
-        cur.close()
-        conn.close()
-        return False
-
-    if image_path and os.path.exists(image_path):
-        with open(image_path, "rb") as f:
-            image_data = f.read()
-        cur.execute("""
-            UPDATE ADS SET TITLE=?, DESCRIPTION=?, PRICE=?, CITY=?, CATEGORY_ID=?, IMAGE=? WHERE ID=?
-        """, (title, description, price, city, category_id, image_data, ad_id))
-    else:
-        cur.execute("""
-            UPDATE ADS SET TITLE=?, DESCRIPTION=?, PRICE=?, CITY=?, CATEGORY_ID=? WHERE ID=?
-        """, (title, description, price, city, category_id, ad_id))
-    
-    conn.commit()
-    cur.close()
-    conn.close()
-    return True
-
+    cur.close(); conn.close()
 
 def delete_ad(ad_id, user_id):
-    """Удаляет объявление (только владелец)."""
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT USER_ID FROM ADS WHERE ID = ?", (ad_id,))
+    cur.execute("SELECT user_id FROM ads WHERE id = ?", (ad_id,))
     owner = cur.fetchone()
-    
     if owner and owner[0] == user_id:
-        # Благодаря ON DELETE CASCADE в БД, связанные FAVORITES и MESSAGES удалятся сами
-        cur.execute("DELETE FROM ADS WHERE ID = ?", (ad_id,))
+        cur.execute("DELETE FROM ads WHERE id = ?", (ad_id,))
         conn.commit()
-        success = True
+        ok = True
     else:
-        success = False
-        
-    cur.close()
-    conn.close()
-    return success
+        ok = False
+    cur.close(); conn.close()
+    return ok
 
-
-# ==========================================
-# 6. Чат (Сообщения)
-# ==========================================
-
-def send_message(sender_id, receiver_id, ad_id, text):
-    """Отправляет сообщение продавцу по объявлению."""
+def get_user_ads(user_id):
     conn = get_connection()
     cur = conn.cursor()
-    new_id = get_next_id(cur, "MESSAGES")
     cur.execute("""
-        INSERT INTO MESSAGES (ID, SENDER_ID, RECEIVER_ID, AD_ID, MESSAGE_TEXT)
-        VALUES (?, ?, ?, ?, ?)
-    """, (new_id, sender_id, receiver_id, ad_id, text))
-    conn.commit()
-    cur.close()
-    conn.close()
+        SELECT a.id, a.title, a.price, a.city, c.name
+        FROM ads a JOIN categories c ON a.category_id = c.id
+        WHERE a.user_id = ? ORDER BY a.id DESC
+    """, (user_id,))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return rows
 
+# --- Чат ---
+def send_message(sender_id, receiver_id, ad_id, text):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO messages (sender_id, receiver_id, ad_id, message_text)
+        VALUES (?, ?, ?, ?)
+    """, (sender_id, receiver_id, ad_id, text))
+    conn.commit()
+    cur.close(); conn.close()
 
 def get_chat_history(user1_id, user2_id, ad_id):
-    """Возвращает переписку между двумя пользователями по конкретному объявлению."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT SENDER_ID, MESSAGE_TEXT, CREATED_AT
-        FROM MESSAGES
-        WHERE AD_ID = ? 
-          AND ((SENDER_ID = ? AND RECEIVER_ID = ?) OR (SENDER_ID = ? AND RECEIVER_ID = ?))
-        ORDER BY CREATED_AT ASC
+        SELECT sender_id, message_text, created_at
+        FROM messages
+        WHERE ad_id = ? AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+        ORDER BY created_at ASC
     """, (ad_id, user1_id, user2_id, user2_id, user1_id))
     rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    cur.close(); conn.close()
+    return rows
+
+def get_messages_list(user_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT m.ad_id, 
+               CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS other_id,
+               MAX(m.created_at) AS last_time
+        FROM messages m
+        WHERE m.sender_id = ? OR m.receiver_id = ?
+        GROUP BY m.ad_id, other_id
+        ORDER BY last_time DESC
+    """, (user_id, user_id, user_id))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
     return rows
