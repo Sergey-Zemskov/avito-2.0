@@ -24,3 +24,4 @@ static/uploads/*
 # --- Журналы и временные файлы ---
 *.log
 *.tmp
+.DS_Store
