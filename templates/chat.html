@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Чат с {{ other[1] }}</h2>
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 10px;">
+    {% for m in history %}
+        <p><b>{% if m[0] == current_user_id %}Вы{% else %}{{ other[1] }}{% endif %}:</b> {{ m[1] }}</p>
+    {% else %}
+        <p>Сообщений нет.</p>
+    {% endfor %}
+</div>
+<form method="POST">
+    <input type="text" name="text" required placeholder="Ваше сообщение...">
+    <button type="submit">Отправить</button>
+</form>
+{% endblock %}

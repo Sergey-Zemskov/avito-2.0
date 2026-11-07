@@ -3,15 +3,11 @@ import hashlib
 import os
 
 DB_PATH = os.path.expanduser("~/avito_db/AVITO.DB")
-DB_USER = "sysdba"
-DB_PASSWORD = "masterkey"
-DB_CHARSET = "UTF8"
+USER = "sysdba"
+PASSWORD = "masterkey"
 
 def get_connection():
-    return fdb.connect(
-        host="localhost", database=DB_PATH,
-        user=DB_USER, password=DB_PASSWORD, charset=DB_CHARSET
-    )
+    return fdb.connect(host="localhost", database=DB_PATH, user=USER, password=PASSWORD, charset="UTF8")
 
 # --- Пользователи ---
 def register_user(login, password):
@@ -19,13 +15,11 @@ def register_user(login, password):
     cur = conn.cursor()
     try:
         pwd_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        # ID генерируется автоматически (IDENTITY)
-        cur.execute("INSERT INTO users (login, password_hash, role) VALUES (?, ?, 'user')", 
-                    (login, pwd_hash))
+        cur.execute("INSERT INTO users (login, password_hash, role) VALUES (?, ?, 'user')", (login, pwd_hash))
         conn.commit()
         return True
     except fdb.DatabaseError:
-        return False # Логин уже существует
+        return False
     finally:
         cur.close(); conn.close()
 
@@ -83,13 +77,22 @@ def get_all_categories():
     cur.close(); conn.close()
     return rows
 
-# --- Карточка ---
+# --- Объявления ---
+def create_ad(user_id, category_id, title, description, price, city, image_data=None):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO ads (user_id, category_id, title, description, price, city, image)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, category_id, title, description, price, city, image_data))
+    conn.commit()
+    cur.close(); conn.close()
+
 def get_ad_details(ad_id):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT a.id, a.title, a.description, a.price, a.city,
-               c.name, u.login, a.user_id, a.category_id
+        SELECT a.id, a.title, a.description, a.price, a.city, c.name, u.login, a.user_id, a.category_id
         FROM ads a
         JOIN categories c ON a.category_id = c.id
         JOIN users u ON a.user_id = u.id
@@ -107,6 +110,51 @@ def get_ad_image(ad_id):
     cur.close(); conn.close()
     return row[0] if row else None
 
+def update_ad(ad_id, user_id, category_id, title, description, price, city, image_data=None):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM ads WHERE id = ?", (ad_id,))
+    owner = cur.fetchone()
+    if not owner or owner[0] != user_id:
+        cur.close(); conn.close()
+        return False
+        
+    if image_data:
+        cur.execute("UPDATE ads SET category_id=?, title=?, description=?, price=?, city=?, image=? WHERE id=?",
+                    (category_id, title, description, price, city, image_data, ad_id))
+    else:
+        cur.execute("UPDATE ads SET category_id=?, title=?, description=?, price=?, city=? WHERE id=?",
+                    (category_id, title, description, price, city, ad_id))
+    conn.commit()
+    cur.close(); conn.close()
+    return True
+
+def get_user_ads(user_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT a.id, a.title, a.price, a.city, c.name
+        FROM ads a JOIN categories c ON a.category_id = c.id
+        WHERE a.user_id = ? ORDER BY a.id DESC
+    """, (user_id,))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return rows
+
+def delete_ad(ad_id, user_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM ads WHERE id = ?", (ad_id,))
+    owner = cur.fetchone()
+    if owner and owner[0] == user_id:
+        cur.execute("DELETE FROM ads WHERE id = ?", (ad_id,))
+        conn.commit()
+        ok = True
+    else:
+        ok = False
+    cur.close(); conn.close()
+    return ok
+
 # --- Избранное ---
 def add_to_favorites(user_id, ad_id):
     conn = get_connection()
@@ -114,9 +162,8 @@ def add_to_favorites(user_id, ad_id):
     try:
         cur.execute("INSERT INTO favorites (user_id, ad_id) VALUES (?, ?)", (user_id, ad_id))
         conn.commit()
-        return True
     except fdb.DatabaseError:
-        return False
+        pass
     finally:
         cur.close(); conn.close()
 
@@ -139,44 +186,7 @@ def get_favorites(user_id):
     cur.close(); conn.close()
     return rows
 
-# --- Управление объявлениями ---
-def create_ad(user_id, category_id, title, description, price, city, image_data=None):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO ads (user_id, category_id, title, description, price, city, image)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (user_id, category_id, title, description, price, city, image_data))
-    conn.commit()
-    cur.close(); conn.close()
-
-def delete_ad(ad_id, user_id):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT user_id FROM ads WHERE id = ?", (ad_id,))
-    owner = cur.fetchone()
-    if owner and owner[0] == user_id:
-        cur.execute("DELETE FROM ads WHERE id = ?", (ad_id,))
-        conn.commit()
-        ok = True
-    else:
-        ok = False
-    cur.close(); conn.close()
-    return ok
-
-def get_user_ads(user_id):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT a.id, a.title, a.price, a.city, c.name
-        FROM ads a JOIN categories c ON a.category_id = c.id
-        WHERE a.user_id = ? ORDER BY a.id DESC
-    """, (user_id,))
-    rows = cur.fetchall()
-    cur.close(); conn.close()
-    return rows
-
-# --- Чат ---
+# --- Сообщения ---
 def send_message(sender_id, receiver_id, ad_id, text):
     conn = get_connection()
     cur = conn.cursor()

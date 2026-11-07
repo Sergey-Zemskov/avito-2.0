@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ ad[1] }}</h2>
+<p><b>Цена:</b> {{ ad[3] }} руб.</p>
+<p><b>Город:</b> {{ ad[4] }}</p>
+<p><b>Категория:</b> {{ ad[5] }}</p>
+<p><b>Продавец:</b> {{ ad[6] }}</p>
+<p><b>Описание:</b> {{ ad[2] }}</p>
+<img src="{{ url_for('image', ad_id=ad[0]) }}" style="max-width: 300px;" alt="Фото">
+<hr>
+{% if current_user_id and current_user_id != ad[7] %}
+    <form action="{{ url_for('fav_add', ad_id=ad[0]) }}" method="POST" style="display:inline;">
+        <button type="submit">В избранное</button>
+    </form>
+    <a href="{{ url_for('chat', ad_id=ad[0], other_id=ad[7]) }}">Написать продавцу</a>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{% if ad %}Редактировать{% else %}Добавить{% endif %} объявление</h2>
+<form method="POST" enctype="multipart/form-data">
+    <label>Название:</label>
+    <input type="text" name="title" value="{{ ad[1] if ad else '' }}" required>
+    
+    <label>Описание:</label>
+    <textarea name="description">{{ ad[2] if ad else '' }}</textarea>
+    
+    <label>Цена:</label>
+    <input type="number" step="0.01" name="price" value="{{ ad[3] if ad else '' }}" required>
+    
+    <label>Город:</label>
+    <input type="text" name="city" value="{{ ad[4] if ad else '' }}" required>
+    
+    <label>Категория:</label>
+    <select name="category_id" required>
+        {% for c in categories %}
+            <option value="{{ c[0] }}" {% if ad and ad[8] == c[0] %}selected{% endif %}>{{ c[1] }}</option>
+        {% endfor %}
+    </select>
+    
+    <label>Фото (если не менять - оставьте пустым):</label>
+    <input type="file" name="image" accept="image/*">
+    
+    <button type="submit">Сохранить</button>
+</form>
+{% endblock %}
