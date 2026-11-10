@@ -1,27 +1,14 @@
 import fdb
 import os
-import shutil
+import hashlib
+import random
+from faker import Faker
 
 # ============================================================
 #  НАСТРОЙКА ПУТИ К БАЗЕ
 # ============================================================
-# Укажите ЯВНО папку, в которой будет лежать файл базы данных.
-# Именно этой папке нужно будет выдать права пользователю Firebird.
-#
-# Пример для Linux (пользователь, под которым работает Firebird, обычно 'firebird'):
-#
-#   sudo mkdir -p /opt/avito_db
-#   sudo chown -R firebird:firebird /opt/avito_db
-#   sudo chmod -R 775 /opt/avito_db
-#
-# Если Firebird запускается под другим пользователем — замените 'firebird'
-# на нужного (см. `ps aux | grep firebird` или `systemctl status firebird`).
-#
-# Пример для Windows — путь вида r"D:\AVITO_DB". Тогда права выдавать не нужно,
-# но папка должна быть доступна на запись пользователю, под которым запущен сервис Firebird.
-# ------------------------------------------------------------
-DB_DIR  = "/opt/avito_db"     # <-- ПАПКА с базой (сюда выдавать права)
-DB_NAME = "AVITO.DB"          # <-- ИМЯ файла базы
+DB_DIR  = "/opt/avito_db"
+DB_NAME = "AVITO.DB"
 DB_PATH = os.path.join(DB_DIR, DB_NAME)
 
 HOST     = "localhost"
@@ -30,54 +17,152 @@ PASSWORD = "masterkey"
 # ============================================================
 
 
-def create_database():
-    # Автоматическая очистка: удаляем старую папку с базой, если она есть
-    if os.path.exists(DB_DIR):
-        print(f"Удаляем старые файлы из {DB_DIR}...")
-        shutil.rmtree(DB_DIR)
+fake = Faker("ru_RU")
+Faker.seed(42)
+random.seed(42)
 
-    # Создаём папку заново
+NUM_USERS     = 20
+NUM_ADS       = 50
+NUM_FAVORITES = 40
+NUM_MESSAGES  = 80
+
+ROLES = ["user", "user", "user", "moderator", "admin"]
+
+CATEGORIES = [
+    ("Электроника",  "Телефоны, ноутбуки, планшеты и другая техника"),
+    ("Транспорт",    "Автомобили, мотоциклы, запчасти"),
+    ("Недвижимость", "Квартиры, дома, коммерческая недвижимость"),
+    ("Услуги",       "Ремонт, обучение, консультации и другие услуги"),
+    ("Работа",       "Вакансии и резюме"),
+    ("Личные вещи",  "Одежда, обувь, аксессуары"),
+]
+
+
+def fill_test_data(cursor):
+    """Заполняет таблицы тестовыми данными. ID генерируются автоматически."""
+
+    # ---------- users ----------
+    user_ids = []
+    for _ in range(NUM_USERS):
+        login = fake.unique.user_name()
+        pwd_hash = hashlib.sha256(fake.password().encode("utf-8")).hexdigest()
+        role = random.choice(ROLES)
+        cursor.execute(
+            "INSERT INTO users (login, password_hash, role) VALUES (?, ?, ?)",
+            (login, pwd_hash, role),
+        )
+        user_ids.append(cursor.lastrowid if hasattr(cursor, "lastrowid") else None)
+
+    # Firebird не отдаёт lastrowid — забираем id явно
+    cursor.execute("SELECT id FROM users ORDER BY id")
+    user_ids = [row[0] for row in cursor.fetchall()]
+
+    # ---------- categories ----------
+    for name, description in CATEGORIES:
+        cursor.execute(
+            "INSERT INTO categories (name, description) VALUES (?, ?)",
+            (name, description),
+        )
+    cursor.execute("SELECT id FROM categories ORDER BY id")
+    category_ids = [row[0] for row in cursor.fetchall()]
+
+    # ---------- ads (image_url = NULL — заглушка) ----------
+    for _ in range(NUM_ADS):
+        cursor.execute(
+            """INSERT INTO ads
+               (user_id, category_id, title, description, price, city, image_url)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                random.choice(user_ids),
+                random.choice(category_ids),
+                fake.sentence(nb_words=4).rstrip(".").capitalize(),
+                fake.text(max_nb_chars=500),
+                round(float(fake.pydecimal(left_digits=6, right_digits=2, positive=True)), 2),
+                fake.city_name(),
+                None,
+            ),
+        )
+    cursor.execute("SELECT id FROM ads ORDER BY id")
+    ad_ids = [row[0] for row in cursor.fetchall()]
+
+    # ---------- favorites ----------
+    pairs = set()
+    while len(pairs) < NUM_FAVORITES:
+        pair = (random.choice(user_ids), random.choice(ad_ids))
+        if pair in pairs:
+            continue
+        pairs.add(pair)
+        cursor.execute(
+            "INSERT INTO favorites (user_id, ad_id) VALUES (?, ?)", pair
+        )
+
+    # ---------- messages ----------
+    for _ in range(NUM_MESSAGES):
+        sender_id = random.choice(user_ids)
+        receiver_id = random.choice(user_ids)
+        while receiver_id == sender_id:
+            receiver_id = random.choice(user_ids)
+        cursor.execute(
+            """INSERT INTO messages
+               (sender_id, receiver_id, ad_id, message_text, created_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (
+                sender_id,
+                receiver_id,
+                random.choice(ad_ids) if random.random() < 0.7 else None,
+                fake.text(max_nb_chars=300),
+                fake.date_time_between(start_date="-30d", end_date="now"),
+            ),
+        )
+
+    print(f"Пользователей: {len(user_ids)}")
+    print(f"Категорий:     {len(category_ids)}")
+    print(f"Объявлений:    {len(ad_ids)}")
+    print(f"Избранного:    {len(pairs)}")
+    print(f"Сообщений:     {NUM_MESSAGES}")
+
+
+def create_database():
     os.makedirs(DB_DIR, exist_ok=True)
-    print(f"Папка для базы готова: {DB_DIR}")
+
+    for suffix in ("", ".env", ".tmp", ".log"):
+        candidate = DB_PATH + suffix
+        if os.path.exists(candidate):
+            print(f"Удаляем старый файл: {candidate}")
+            os.remove(candidate)
 
     conn = None
     cursor = None
     try:
-        # Подключаемся (файл создастся автоматически)
         conn = fdb.create_database(
             database=f"{HOST}:{DB_PATH}",
-            user=USER,
-            password=PASSWORD,
-            charset="UTF8"
+            user=USER, password=PASSWORD, charset="UTF8",
         )
         cursor = conn.cursor()
         print("Файл базы данных успешно создан!")
 
-        print("Создание пустых таблиц для ER-диаграммы...")
-
-        # 1. Пользователи
+        # ВАЖНО: GENERATED BY DEFAULT AS IDENTITY — автоинкремент.
+        # Это и есть основное исправление регистрации: INSERT без id теперь работает.
         cursor.execute('''
             CREATE TABLE users (
-                id INTEGER PRIMARY KEY,
+                id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                 login VARCHAR(50) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 role VARCHAR(20) NOT NULL
             )
         ''')
 
-        # 2. Категории
         cursor.execute('''
             CREATE TABLE categories (
-                id INTEGER PRIMARY KEY,
+                id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                 name VARCHAR(100) UNIQUE NOT NULL,
                 description VARCHAR(1000)
             )
         ''')
 
-        # 3. Объявления
         cursor.execute('''
             CREATE TABLE ads (
-                id INTEGER PRIMARY KEY,
+                id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 category_id INTEGER NOT NULL,
                 title VARCHAR(255) NOT NULL,
@@ -90,10 +175,9 @@ def create_database():
             )
         ''')
 
-        # 4. Избранное
         cursor.execute('''
             CREATE TABLE favorites (
-                id INTEGER PRIMARY KEY,
+                id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 ad_id INTEGER NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -102,10 +186,9 @@ def create_database():
             )
         ''')
 
-        # 5. Сообщения (Чат)
         cursor.execute('''
             CREATE TABLE messages (
-                id INTEGER PRIMARY KEY,
+                id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                 sender_id INTEGER NOT NULL,
                 receiver_id INTEGER NOT NULL,
                 ad_id INTEGER,
@@ -119,9 +202,15 @@ def create_database():
 
         conn.commit()
         print("Все таблицы успешно созданы!")
-        print(f"Файл базы данных сохранен по пути: {DB_PATH}")
+
+        print("Заполнение тестовыми данными...")
+        fill_test_data(cursor)
+        conn.commit()
+        print(f"Готово: {DB_PATH}")
 
     except fdb.DatabaseError as e:
+        if conn:
+            conn.rollback()
         print(f"Ошибка базы данных: {e}")
     except Exception as e:
         print(f"Общая ошибка: {e}")
