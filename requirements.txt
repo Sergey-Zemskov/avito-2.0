@@ -3,3 +3,10 @@ fdb==2.0.4
 Faker>=25.0.0
 
 #pip install -r requirements.txt
+#export DB_HOST="localhost"
+#export DB_PATH="/opt/avito_db/AVITO.DB"
+#export DB_USER="sysdba"
+#export DB_PASSWORD="твой_пароль_БД"
+#export DB_CHARSET="UTF8"
+
+#export SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
