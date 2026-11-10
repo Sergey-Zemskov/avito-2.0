@@ -2,31 +2,58 @@ import fdb
 import os
 import shutil
 
-# Путь, где будет создан файл базы данных (оставляю ваш путь с диска D)
-DB_PATH = r"D:\AVITO_DB\AVITO.DB"
-DB_DIR = os.path.dirname(DB_PATH)
+# ============================================================
+#  НАСТРОЙКА ПУТИ К БАЗЕ
+# ============================================================
+# Укажите ЯВНО папку, в которой будет лежать файл базы данных.
+# Именно этой папке нужно будет выдать права пользователю Firebird.
+#
+# Пример для Linux (пользователь, под которым работает Firebird, обычно 'firebird'):
+#
+#   sudo mkdir -p /opt/avito_db
+#   sudo chown -R firebird:firebird /opt/avito_db
+#   sudo chmod -R 775 /opt/avito_db
+#
+# Если Firebird запускается под другим пользователем — замените 'firebird'
+# на нужного (см. `ps aux | grep firebird` или `systemctl status firebird`).
+#
+# Пример для Windows — путь вида r"D:\AVITO_DB". Тогда права выдавать не нужно,
+# но папка должна быть доступна на запись пользователю, под которым запущен сервис Firebird.
+# ------------------------------------------------------------
+DB_DIR  = "/opt/avito_db"     # <-- ПАПКА с базой (сюда выдавать права)
+DB_NAME = "AVITO.DB"          # <-- ИМЯ файла базы
+DB_PATH = os.path.join(DB_DIR, DB_NAME)
+
+HOST     = "localhost"
+USER     = "sysdba"
+PASSWORD = "masterkey"
+# ============================================================
+
 
 def create_database():
-    # 🔥 АВТОМАТИЧЕСКАЯ ОЧИСТКА: Удаляем старую папку/файл, если они есть
+    # Автоматическая очистка: удаляем старую папку с базой, если она есть
     if os.path.exists(DB_DIR):
-        print(f"🗑️ Удаляем старые файлы из {DB_DIR}...")
-        shutil.rmtree(DB_DIR) # Удаляем папку целиком
-        
-    # Создаем папку заново
-    os.makedirs(DB_DIR, exist_ok=True)
+        print(f"Удаляем старые файлы из {DB_DIR}...")
+        shutil.rmtree(DB_DIR)
 
+    # Создаём папку заново
+    os.makedirs(DB_DIR, exist_ok=True)
+    print(f"Папка для базы готова: {DB_DIR}")
+
+    conn = None
+    cursor = None
     try:
-        # Подключаемся (файл создастся автоматически, так как мы его только что удалили)
+        # Подключаемся (файл создастся автоматически)
         conn = fdb.create_database(
-            database=f"localhost:{DB_PATH}", 
-            user="sysdba", 
-            password="masterkey", 
+            database=f"{HOST}:{DB_PATH}",
+            user=USER,
+            password=PASSWORD,
             charset="UTF8"
         )
         cursor = conn.cursor()
-        print("✅ Файл базы данных успешно создан!")
+        print("Файл базы данных успешно создан!")
 
-        print("📝 Создание пустых таблиц для ER-диаграммы...")
+        print("Создание пустых таблиц для ER-диаграммы...")
 
         # 1. Пользователи
         cursor.execute('''
@@ -91,17 +118,20 @@ def create_database():
         ''')
 
         conn.commit()
-        print("✅ Все таблицы успешно созданы!")
-        print(f"📂 Файл базы данных сохранен по пути: {DB_PATH}")
+        print("Все таблицы успешно созданы!")
+        print(f"Файл базы данных сохранен по пути: {DB_PATH}")
 
     except fdb.DatabaseError as e:
-        print(f"❌ Ошибка базы данных: {e}")
+        print(f"Ошибка базы данных: {e}")
     except Exception as e:
-        print(f"❌ Общая ошибка: {e}")
+        print(f"Общая ошибка: {e}")
     finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
-        print("🔒 Соединение закрыто.")
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+        print("Соединение закрыто.")
+
 
 if __name__ == "__main__":
     create_database()
