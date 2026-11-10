@@ -1,11 +1,12 @@
 import fdb
 import os
 import hashlib
+from functools import wraps
 
 # ============================================================
-#  ПОДКЛЮЧЕНИЕ К БАЗЕ
+#  ЕДИНЫЙ ПУТЬ К БАЗЕ ДЛЯ ВСЕГО ПРОЕКТА
 # ============================================================
-DB_PATH = os.getenv("AVITO_DB_PATH", "/opt/avito_db/AVITO.DB")
+DB_PATH = "/opt/avito_db/AVITO.DB"
 
 HOST     = "localhost"
 USER     = "sysdba"
@@ -15,8 +16,7 @@ CHARSET  = "UTF8"
 
 def get_connection():
     return fdb.connect(
-        host=HOST,
-        database=DB_PATH,
+        dsn=f"{HOST}:{DB_PATH}",
         user=USER,
         password=PASSWORD,
         charset=CHARSET,
@@ -31,7 +31,6 @@ def _hash(password: str) -> str:
 #  ПОЛЬЗОВАТЕЛИ
 # ============================================================
 def register_user(login: str, password: str):
-    """Регистрирует пользователя. Возвращает id или None."""
     if not login or not password:
         return None
     conn = get_connection()
@@ -42,11 +41,13 @@ def register_user(login: str, password: str):
             "VALUES (?, ?, 'user') RETURNING id",
             (login, _hash(password)),
         )
-        new_id = cur.fetchone()[0]
+        row = cur.fetchone()
+        new_id = row[0] if row else None
         conn.commit()
         return new_id
-    except fdb.DatabaseError:
+    except fdb.DatabaseError as e:
         conn.rollback()
+        print(f"register_user: {e}")
         return None
     finally:
         cur.close()
@@ -54,7 +55,6 @@ def register_user(login: str, password: str):
 
 
 def login_user(login: str, password: str):
-    """Возвращает (id, login, role) или None."""
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -69,7 +69,9 @@ def login_user(login: str, password: str):
         conn.close()
 
 
-def get_user_by_id(user_id: int):
+def get_user_by_id(user_id):
+    if not user_id:
+        return None
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -81,7 +83,7 @@ def get_user_by_id(user_id: int):
 
 
 # ============================================================
-#  КАТЕГОРИИ И ГОРОДА (для фильтров)
+#  КАТЕГОРИИ / ГОРОДА
 # ============================================================
 def get_all_categories():
     conn = get_connection()
@@ -99,18 +101,17 @@ def get_all_cities():
     cur = conn.cursor()
     try:
         cur.execute("SELECT DISTINCT city FROM ads ORDER BY city")
-        return [row[0] for row in cur.fetchall()]
+        return [r[0] for r in cur.fetchall()]
     finally:
         cur.close()
         conn.close()
 
 
 # ============================================================
-#  КАТАЛОГ / ОБЪЯВЛЕНИЯ
+#  ОБЪЯВЛЕНИЯ
 # ============================================================
-def get_catalog(search_query: str = "", category_id=None,
-                city: str = "", sort_by: str = "date", limit: int = 200):
-    """Список объявлений с фильтрами."""
+def get_catalog(search_query="", category_id=None, city="",
+                sort_by="date", limit=200):
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -126,7 +127,7 @@ def get_catalog(search_query: str = "", category_id=None,
         if search_query:
             sql += " AND (LOWER(a.title) LIKE ? OR LOWER(a.description) LIKE ?)"
             like = f"%{search_query.lower()}%"
-            params.extend([like, like])
+            params += [like, like]
         if category_id:
             sql += " AND a.category_id = ?"
             params.append(int(category_id))
@@ -141,8 +142,8 @@ def get_catalog(search_query: str = "", category_id=None,
         else:
             sql += " ORDER BY a.id DESC"
 
-        sql += " ROWS ?" if limit else ""
         if limit:
+            sql += " ROWS ?"
             params.append(int(limit))
 
         cur.execute(sql, params)
@@ -152,14 +153,13 @@ def get_catalog(search_query: str = "", category_id=None,
         conn.close()
 
 
-def get_ad_details(ad_id: int):
+def get_ad_details(ad_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
         cur.execute("""
             SELECT a.id, a.title, a.description, a.price, a.city, a.image_url,
-                   c.id AS category_id, c.name AS category,
-                   u.id AS seller_id, u.login AS seller
+                   c.id, c.name, u.id, u.login
             FROM ads a
             JOIN categories c ON a.category_id = c.id
             JOIN users u      ON a.user_id     = u.id
@@ -182,12 +182,13 @@ def create_ad(user_id, category_id, title, description, price, city,
                VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id""",
             (user_id, category_id, title, description, price, city, image_url),
         )
-        new_id = cur.fetchone()[0]
+        row = cur.fetchone()
+        new_id = row[0] if row else None
         conn.commit()
         return new_id
     except fdb.DatabaseError as e:
         conn.rollback()
-        print(f"create_ad error: {e}")
+        print(f"create_ad: {e}")
         return None
     finally:
         cur.close()
@@ -196,14 +197,13 @@ def create_ad(user_id, category_id, title, description, price, city,
 
 def update_ad(ad_id, user_id, category_id, title, description, price, city,
               image_url=None):
-    """Обновляет объявление, только если оно принадлежит user_id."""
     conn = get_connection()
     cur = conn.cursor()
     try:
         cur.execute(
-            """UPDATE ads SET category_id = ?, title = ?, description = ?,
-                              price = ?, city = ?, image_url = ?
-               WHERE id = ? AND user_id = ?""",
+            """UPDATE ads SET category_id=?, title=?, description=?,
+                              price=?, city=?, image_url=?
+               WHERE id=? AND user_id=?""",
             (category_id, title, description, price, city, image_url,
              ad_id, user_id),
         )
@@ -212,7 +212,7 @@ def update_ad(ad_id, user_id, category_id, title, description, price, city,
         return ok
     except fdb.DatabaseError as e:
         conn.rollback()
-        print(f"update_ad error: {e}")
+        print(f"update_ad: {e}")
         return False
     finally:
         cur.close()
@@ -223,7 +223,7 @@ def delete_ad(ad_id, user_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("DELETE FROM ads WHERE id = ? AND user_id = ?",
+        cur.execute("DELETE FROM ads WHERE id=? AND user_id=?",
                     (ad_id, user_id))
         ok = cur.rowcount > 0
         conn.commit()
@@ -256,10 +256,8 @@ def add_favorite(user_id, ad_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute(
-            "INSERT INTO favorites (user_id, ad_id) VALUES (?, ?)",
-            (user_id, ad_id),
-        )
+        cur.execute("INSERT INTO favorites (user_id, ad_id) VALUES (?, ?)",
+                    (user_id, ad_id))
         conn.commit()
         return True
     except fdb.DatabaseError:
@@ -274,7 +272,7 @@ def remove_favorite(user_id, ad_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("DELETE FROM favorites WHERE user_id = ? AND ad_id = ?",
+        cur.execute("DELETE FROM favorites WHERE user_id=? AND ad_id=?",
                     (user_id, ad_id))
         conn.commit()
         return cur.rowcount > 0
@@ -283,11 +281,11 @@ def remove_favorite(user_id, ad_id):
         conn.close()
 
 
-def is_favorite(user_id, ad_id) -> bool:
+def is_favorite(user_id, ad_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT 1 FROM favorites WHERE user_id = ? AND ad_id = ?",
+        cur.execute("SELECT 1 FROM favorites WHERE user_id=? AND ad_id=?",
                     (user_id, ad_id))
         return cur.fetchone() is not None
     finally:
@@ -332,7 +330,7 @@ def send_message(sender_id, receiver_id, ad_id, text):
         return True
     except fdb.DatabaseError as e:
         conn.rollback()
-        print(f"send_message error: {e}")
+        print(f"send_message: {e}")
         return False
     finally:
         cur.close()
@@ -340,7 +338,6 @@ def send_message(sender_id, receiver_id, ad_id, text):
 
 
 def get_dialog(user_id, other_id, ad_id=None):
-    """Сообщения между двумя пользователями (по конкретному объявлению или все)."""
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -349,12 +346,12 @@ def get_dialog(user_id, other_id, ad_id=None):
                    m.message_text, m.created_at, u.login
             FROM messages m
             JOIN users u ON m.sender_id = u.id
-            WHERE ((m.sender_id = ? AND m.receiver_id = ?)
-                OR (m.sender_id = ? AND m.receiver_id = ?))
+            WHERE ((m.sender_id=? AND m.receiver_id=?)
+                OR (m.sender_id=? AND m.receiver_id=?))
         """
         params = [user_id, other_id, other_id, user_id]
         if ad_id is not None:
-            sql += " AND m.ad_id = ?"
+            sql += " AND m.ad_id=?"
             params.append(ad_id)
         sql += " ORDER BY m.created_at ASC"
         cur.execute(sql, params)
@@ -365,21 +362,18 @@ def get_dialog(user_id, other_id, ad_id=None):
 
 
 def get_conversations(user_id):
-    """Список собеседников с последним сообщением."""
     conn = get_connection()
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT u.id, u.login, MAX(m.created_at) AS last_time
+            SELECT u.id, u.login, MAX(m.created_at)
             FROM messages m
             JOIN users u
-              ON u.id = CASE
-                          WHEN m.sender_id = ? THEN m.receiver_id
-                          ELSE m.sender_id
-                        END
-            WHERE m.sender_id = ? OR m.receiver_id = ?
+              ON u.id = CASE WHEN m.sender_id=?
+                             THEN m.receiver_id ELSE m.sender_id END
+            WHERE m.sender_id=? OR m.receiver_id=?
             GROUP BY u.id, u.login
-            ORDER BY last_time DESC
+            ORDER BY 3 DESC
         """, (user_id, user_id, user_id))
         return cur.fetchall()
     finally:
