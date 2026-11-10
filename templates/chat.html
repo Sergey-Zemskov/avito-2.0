@@ -1,51 +1,82 @@
-
 {% extends "base.html" %}
 
-{% block title %}Переписка с {{ other[1] }}{% endblock %}
-
 {% block content %}
-<h2>Переписка с {{ other[1] }}</h2>
 
-{% if ad_id %}
+<div class="container">
+
+    <h1>Переписка</h1>
+
+    <h3>
+        Собеседник: {{ other[1] }}
+    </h3>
+
+    <div class="chat-messages">
+
+        {% if messages %}
+
+            {% for m in messages %}
+
+                <div class="message">
+
+                    {% if m[1] == current_user_id %}
+
+                        <p>
+                            <strong>Вы:</strong>
+                            {{ m[4] }}
+                        </p>
+
+                    {% else %}
+
+                        <p>
+                            <strong>{{ m[6] }}:</strong>
+                            {{ m[4] }}
+                        </p>
+
+                    {% endif %}
+
+                    <small>
+                        {{ m[5] }}
+                    </small>
+
+                </div>
+
+                <hr>
+
+            {% endfor %}
+
+        {% else %}
+
+            <p>Сообщений пока нет.</p>
+
+        {% endif %}
+
+    </div>
+
+    <form method="POST">
+
+        <div>
+            <label for="message">Ваше сообщение:</label>
+
+            <textarea
+                name="message"
+                id="message"
+                rows="3"
+                required
+            ></textarea>
+        </div>
+
+        <button type="submit">
+            Отправить
+        </button>
+
+    </form>
+
     <p>
-        Объявление:
-        <a href="{{ url_for('ad_detail', ad_id=ad_id) }}">
-            Открыть объявление
+        <a href="{{ url_for('messages') }}">
+            Вернуться к сообщениям
         </a>
     </p>
-{% endif %}
 
-<div class="chat-history">
-    {% for message in messages %}
-        <div class="message">
-            <p>
-                <strong>
-                    {% if message[1] == current_user_id %}
-                        Вы
-                    {% else %}
-                        {{ message[6] }}
-                    {% endif %}
-                </strong>
-            </p>
-
-            <p>{{ message[4] }}</p>
-            <small>{{ message[5] }}</small>
-        </div>
-    {% else %}
-        <p>Сообщений пока нет.</p>
-    {% endfor %}
 </div>
 
-<form method="POST">
-    <textarea
-        name="text"
-        maxlength="2000"
-        placeholder="Введите сообщение..."
-        required
-    ></textarea>
-
-    <button type="submit">Отправить</button>
-</form>
-
-<a href="{{ url_for('messages_list') }}">Вернуться к перепискам</a>
 {% endblock %}

@@ -1,8 +1,3 @@
-
-import os
-from functools import wraps
-from flask import Response
-
 from flask import (
     Flask,
     render_template,
@@ -11,484 +6,441 @@ from flask import (
     url_for,
     session,
     flash,
-    abort,
+    Response
 )
 
+from functools import wraps
 import db_functions as db
 
 
 app = Flask(__name__)
 
-secret_key = os.getenv("SECRET_KEY")
-if not secret_key:
-    raise RuntimeError(
-        "Не задан SECRET_KEY. Установите переменную окружения SECRET_KEY."
-    )
-
-app.config["SECRET_KEY"] = secret_key
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# Ключ для работы с сессиями
+app.secret_key = "avito-secret-key"
 
 
-# ============================================================
-# ПОЛЬЗОВАТЕЛИ И СЕССИИ
-# ============================================================
+def login_required(function):
+    """Проверка авторизации пользователя."""
 
-def current_user_id():
-    user_id = session.get("user_id")
-    return int(user_id) if user_id is not None else None
-
-
-def login_required(func):
-    @wraps(func)
+    @wraps(function)
     def wrapper(*args, **kwargs):
-        if current_user_id() is None:
-            flash("Для выполнения действия необходимо войти.", "error")
+        if "user_id" not in session:
+            flash("Сначала необходимо войти в аккаунт.")
             return redirect(url_for("login"))
-        return func(*args, **kwargs)
+
+        return function(*args, **kwargs)
 
     return wrapper
 
 
 @app.context_processor
-def inject_user():
-    user_id = current_user_id()
-    user = db.get_user_by_id(user_id) if user_id is not None else None
+def add_user():
+    """Передача данных пользователя во все шаблоны."""
 
     return {
-        "current_user": user,
-        "current_user_id": user_id,
-        "current_login": user[1] if user else None,
+        "current_user_id": session.get("user_id"),
+        "current_login": session.get("login"),
+        "current_user": db.get_user_by_id(session["user_id"])
+        if "user_id" in session else None
     }
 
 
-# ============================================================
-# ГЛАВНАЯ СТРАНИЦА И КАТАЛОГ
-# ============================================================
-
 @app.route("/")
 def index():
-    search_query = request.args.get("q", "").strip()
-    category_id = request.args.get("category_id", "").strip()
-    city = request.args.get("city", "").strip()
+    """Главная страница с каталогом объявлений."""
+
+    search_query = request.args.get("q", "")
+    selected_category = request.args.get("category_id", "")
+    selected_city = request.args.get("city", "")
     sort_by = request.args.get("sort", "date")
 
-    if sort_by not in ("date", "price_asc", "price_desc"):
-        sort_by = "date"
+    category_id = None
 
-    try:
-        category_id = int(category_id) if category_id else None
-    except ValueError:
-        category_id = None
+    if selected_category:
+        try:
+            category_id = int(selected_category)
+        except ValueError:
+            category_id = None
 
     ads = db.get_catalog(
         search_query=search_query,
         category_id=category_id,
-        city=city,
-        sort_by=sort_by,
+        city=selected_city,
+        sort_by=sort_by
     )
+
+    categories = db.get_all_categories()
+    cities = db.get_all_cities()
 
     return render_template(
         "index.html",
         ads=ads,
-        categories=db.get_all_categories(),
-        cities=db.get_all_cities(),
+        categories=categories,
+        cities=cities,
         search_query=search_query,
-        selected_category=category_id,
-        selected_city=city,
-        sort_by=sort_by,
+        selected_category=selected_category,
+        selected_city=selected_city,
+        sort_by=sort_by
     )
 
 
-# ============================================================
-# РЕГИСТРАЦИЯ
-# ============================================================
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    """Регистрация пользователя."""
+
     if request.method == "POST":
         login = request.form.get("login", "").strip()
         password = request.form.get("password", "")
 
-        if len(login) < 3 or len(login) > 50:
-            flash("Логин должен содержать от 3 до 50 символов.", "error")
-            return render_template("register.html")
+        if not login or not password:
+            flash("Заполните все поля.")
+            return redirect(url_for("register"))
 
-        if len(password) < 6:
-            flash("Пароль должен содержать не менее 6 символов.", "error")
-            return render_template("register.html")
+        if len(password) < 4:
+            flash("Пароль должен содержать не менее 4 символов.")
+            return redirect(url_for("register"))
 
         user_id = db.register_user(login, password)
 
-        if user_id is None:
-            flash("Не удалось зарегистрировать пользователя. Возможно, логин занят.", "error")
-            return render_template("register.html")
+        if user_id:
+            flash("Регистрация прошла успешно. Теперь войдите.")
+            return redirect(url_for("login"))
 
-        session.clear()
-        session["user_id"] = int(user_id)
-
-        flash("Регистрация успешно завершена.", "success")
-        return redirect(url_for("index"))
+        flash("Пользователь с таким логином уже существует.")
 
     return render_template("register.html")
 
 
-# ============================================================
-# АВТОРИЗАЦИЯ
-# ============================================================
-
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    """Авторизация пользователя."""
+
     if request.method == "POST":
         login_value = request.form.get("login", "").strip()
         password = request.form.get("password", "")
 
-        row = db.login_user(login_value, password)
+        user = db.login_user(login_value, password)
 
-        if not row:
-            flash("Неверный логин или пароль.", "error")
-            return render_template("login.html")
+        if user:
+            session["user_id"] = user[0]
+            session["login"] = user[1]
+            session["role"] = user[2]
 
-        session.clear()
-        session["user_id"] = int(row[0])
+            flash("Вы успешно вошли в аккаунт.")
+            return redirect(url_for("index"))
 
-        flash("Вы успешно вошли в систему.", "success")
-        return redirect(url_for("index"))
+        flash("Неверный логин или пароль.")
 
     return render_template("login.html")
 
 
-# ============================================================
-# ВЫХОД
-# ============================================================
-
-@app.route("/logout", methods=["GET", "POST"])
+@app.route("/logout")
 def logout():
+    """Выход из аккаунта."""
+
     session.clear()
-    flash("Вы вышли из аккаунта.", "success")
+    flash("Вы вышли из аккаунта.")
+
     return redirect(url_for("index"))
 
 
-# ============================================================
-# ИЗОБРАЖЕНИЯ
-# ============================================================
-
-@app.route("/image/<int:ad_id>")
-def image(ad_id):
-    ad = db.get_ad_details(ad_id)
-
-    if not ad or not ad[5]:
-        abort(404)
-
-    return redirect(ad[5])
-
-
-# ============================================================
-# ПРОСМОТР ОБЪЯВЛЕНИЯ
-# ============================================================
-
 @app.route("/ad/<int:ad_id>")
 def ad_detail(ad_id):
+    """Страница отдельного объявления."""
+
     ad = db.get_ad_details(ad_id)
 
     if not ad:
-        abort(404)
+        return "Объявление не найдено", 404
 
-    user_id = current_user_id()
-    is_favorite = (
-        db.is_favorite(user_id, ad_id)
-        if user_id is not None
-        else False
-    )
+    favorite = False
+
+    if "user_id" in session:
+        favorite = db.is_favorite(session["user_id"], ad_id)
 
     return render_template(
         "ad_detail.html",
         ad=ad,
-        is_favorite=is_favorite,
+        favorite=favorite
     )
 
-
-# ============================================================
-# СОЗДАНИЕ ОБЪЯВЛЕНИЯ
-# ============================================================
 
 @app.route("/ad/create", methods=["GET", "POST"])
 @login_required
 def ad_create():
+    """Создание нового объявления."""
+
     categories = db.get_all_categories()
 
     if request.method == "POST":
+        category_id = request.form.get("category_id")
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
+        price = request.form.get("price", "")
         city = request.form.get("city", "").strip()
-        image_url = request.form.get("image_url", "").strip() or None
+        image_url = request.form.get("image_url", "").strip()
 
         try:
-            price = float(request.form.get("price", "").replace(",", "."))
-            category_id = int(request.form.get("category_id", ""))
+            category_id = int(category_id)
+            price = float(price)
+
+            if price < 0:
+                raise ValueError
+
         except (ValueError, TypeError):
-            flash("Проверьте цену и категорию.", "error")
-            return render_template("ad_form.html", categories=categories, ad=None)
+            flash("Проверьте категорию и цену.")
+            return redirect(url_for("ad_create"))
 
-        if not title or not city:
-            flash("Название и город обязательны.", "error")
-            return render_template("ad_form.html", categories=categories, ad=None)
+        if not title or not description or not city:
+            flash("Заполните все обязательные поля.")
+            return redirect(url_for("ad_create"))
 
-        if price < 0:
-            flash("Цена не может быть отрицательной.", "error")
-            return render_template("ad_form.html", categories=categories, ad=None)
-
-        if not any(c[0] == category_id for c in categories):
-            flash("Выбрана несуществующая категория.", "error")
-            return render_template("ad_form.html", categories=categories, ad=None)
-
-        new_id = db.create_ad(
-            user_id=current_user_id(),
+        result = db.create_ad(
+            user_id=session["user_id"],
             category_id=category_id,
             title=title,
             description=description,
             price=price,
             city=city,
-            image_url=image_url,
+            image_url=image_url if image_url else None
         )
 
-        if new_id is None:
-            flash("Не удалось создать объявление.", "error")
-            return render_template("ad_form.html", categories=categories, ad=None)
+        if result:
+            flash("Объявление успешно создано.")
+            return redirect(url_for("index"))
 
-        flash("Объявление успешно создано.", "success")
-        return redirect(url_for("ad_detail", ad_id=new_id))
+        flash("Не удалось создать объявление.")
 
     return render_template(
-        "ad_form.html",
-        categories=categories,
-        ad=None,
+        "ad_create.html",
+        categories=categories
     )
 
 
-# ============================================================
-# РЕДАКТИРОВАНИЕ ОБЪЯВЛЕНИЯ
-# ============================================================
-
-@app.route("/ad/<int:ad_id>/edit", methods=["GET", "POST"])
+@app.route("/ad/edit/<int:ad_id>", methods=["GET", "POST"])
 @login_required
 def ad_edit(ad_id):
+    """Редактирование объявления."""
+
     ad = db.get_ad_details(ad_id)
 
     if not ad:
-        abort(404)
+        return "Объявление не найдено", 404
 
-    # Индекс 8 — идентификатор владельца объявления.
-    if int(ad[8]) != current_user_id():
-        abort(403)
+    # Проверяем, что объявление принадлежит текущему пользователю
+    if ad[8] != session["user_id"]:
+        return "Нет доступа к этому объявлению", 403
 
     categories = db.get_all_categories()
 
     if request.method == "POST":
+        category_id = request.form.get("category_id")
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
+        price = request.form.get("price", "")
         city = request.form.get("city", "").strip()
-        image_url = request.form.get("image_url", "").strip() or ad[5]
+        image_url = request.form.get("image_url", "").strip()
 
         try:
-            price = float(request.form.get("price", "").replace(",", "."))
-            category_id = int(request.form.get("category_id", ""))
+            category_id = int(category_id)
+            price = float(price)
+
+            if price < 0:
+                raise ValueError
+
         except (ValueError, TypeError):
-            flash("Проверьте цену и категорию.", "error")
-            return render_template("ad_form.html", categories=categories, ad=ad)
+            flash("Проверьте категорию и цену.")
+            return redirect(url_for("ad_edit", ad_id=ad_id))
 
-        if not title or not city or price < 0:
-            flash("Проверьте введённые данные.", "error")
-            return render_template("ad_form.html", categories=categories, ad=ad)
+        if not title or not description or not city:
+            flash("Заполните все обязательные поля.")
+            return redirect(url_for("ad_edit", ad_id=ad_id))
 
-        if not any(c[0] == category_id for c in categories):
-            flash("Выбрана несуществующая категория.", "error")
-            return render_template("ad_form.html", categories=categories, ad=ad)
-
-        success = db.update_ad(
+        result = db.update_ad(
             ad_id=ad_id,
-            user_id=current_user_id(),
+            user_id=session["user_id"],
             category_id=category_id,
             title=title,
             description=description,
             price=price,
             city=city,
-            image_url=image_url,
+            image_url=image_url if image_url else None
         )
 
-        if not success:
-            flash("Не удалось сохранить изменения.", "error")
-            return render_template("ad_form.html", categories=categories, ad=ad)
+        if result:
+            flash("Объявление изменено.")
+            return redirect(url_for("ad_detail", ad_id=ad_id))
 
-        flash("Объявление обновлено.", "success")
-        return redirect(url_for("ad_detail", ad_id=ad_id))
+        flash("Не удалось изменить объявление.")
 
     return render_template(
-        "ad_form.html",
-        categories=categories,
+        "ad_edit.html",
         ad=ad,
+        categories=categories
     )
 
 
-# ============================================================
-# УДАЛЕНИЕ ОБЪЯВЛЕНИЯ
-# ============================================================
-
-@app.route("/ad/<int:ad_id>/delete", methods=["POST"])
+@app.route("/ad/delete/<int:ad_id>", methods=["GET", "POST"])
 @login_required
 def ad_delete(ad_id):
-    success = db.delete_ad(ad_id, current_user_id())
+    """Удаление объявления."""
 
-    if not success:
-        abort(403)
+    result = db.delete_ad(ad_id, session["user_id"])
 
-    flash("Объявление удалено.", "success")
+    if result:
+        flash("Объявление удалено.")
+    else:
+        flash("Не удалось удалить объявление.")
+
     return redirect(url_for("profile"))
 
-
-# ============================================================
-# ИЗБРАННОЕ
-# ============================================================
 
 @app.route("/favorites")
 @login_required
 def favorites():
+    """Страница избранных объявлений."""
+
+    ads = db.get_user_favorites(session["user_id"])
+
     return render_template(
         "favorites.html",
-        ads=db.get_user_favorites(current_user_id()),
+        ads=ads
     )
 
 
-@app.route("/favorite/<int:ad_id>/toggle", methods=["POST"])
+@app.route("/favorite/<int:ad_id>")
 @login_required
 def favorite_toggle(ad_id):
-    if not db.get_ad_details(ad_id):
-        abort(404)
+    """Добавление или удаление объявления из избранного."""
 
-    if db.is_favorite(current_user_id(), ad_id):
-        db.remove_favorite(current_user_id(), ad_id)
-        flash("Объявление удалено из избранного.", "success")
+    if db.is_favorite(session["user_id"], ad_id):
+        db.remove_favorite(session["user_id"], ad_id)
     else:
-        db.add_favorite(current_user_id(), ad_id)
-        flash("Объявление добавлено в избранное.", "success")
+        db.add_favorite(session["user_id"], ad_id)
 
     return redirect(request.referrer or url_for("index"))
 
 
-# ============================================================
-# ПРОФИЛЬ
-# ============================================================
-
 @app.route("/profile")
 @login_required
 def profile():
+    """Личный кабинет пользователя."""
+
+    user = db.get_user_by_id(session["user_id"])
+    ads = db.get_user_ads(session["user_id"])
+
     return render_template(
         "profile.html",
-        user=db.get_user_by_id(current_user_id()),
-        ads=db.get_user_ads(current_user_id()),
+        user=user,
+        ads=ads
     )
 
-
-# ============================================================
-# СПИСОК ПЕРЕПИСОК
-# ============================================================
 
 @app.route("/messages")
 @login_required
-def messages_list():
+def messages():
+    """Список переписок пользователя."""
+
+    conversations = db.get_conversations(session["user_id"])
+
     return render_template(
         "messages.html",
-        conversations=db.get_conversations(current_user_id()),
+        conversations=conversations
     )
 
 
-# ============================================================
-# ЧАТ
-# ============================================================
-
-@app.route("/messages/<int:other_id>", methods=["GET", "POST"])
+@app.route("/chat/<int:other_id>", methods=["GET", "POST"])
 @login_required
 def chat(other_id):
-    user_id = current_user_id()
+    """Переписка с другим пользователем."""
 
-    if other_id == user_id:
-        abort(400)
+    user = db.get_user_by_id(other_id)
 
-    other = db.get_user_by_id(other_id)
+    if not user:
+        return "Пользователь не найден", 404
 
-    if not other:
-        abort(404)
+    if other_id == session["user_id"]:
+        return "Нельзя открыть переписку с самим собой", 400
 
-    ad_id = request.args.get("ad_id", type=int)
+    ad_id = request.args.get("ad_id")
+
+    if ad_id:
+        try:
+            ad_id = int(ad_id)
+        except ValueError:
+            ad_id = None
 
     if request.method == "POST":
-        message_text = request.form.get("text", "").strip()
+        message_text = request.form.get("message", "").strip()
 
-        if not message_text:
-            flash("Нельзя отправить пустое сообщение.", "error")
-        elif len(message_text) > 2000:
-            flash("Сообщение слишком длинное.", "error")
-        else:
-            success = db.send_message(
-                sender_id=user_id,
+        if message_text:
+            db.send_message(
+                sender_id=session["user_id"],
                 receiver_id=other_id,
                 ad_id=ad_id,
-                text=message_text,
+                message_text=message_text
             )
-
-            if not success:
-                flash("Не удалось отправить сообщение.", "error")
 
         return redirect(
             url_for("chat", other_id=other_id, ad_id=ad_id)
-            if ad_id else url_for("chat", other_id=other_id)
         )
 
-    messages = db.get_dialog(user_id, other_id, ad_id)
+    messages_list = db.get_dialog(
+        user_id=session["user_id"],
+        other_id=other_id,
+        ad_id=ad_id
+    )
 
     return render_template(
         "chat.html",
-        other=other,
-        messages=messages,
-        history=messages,
-        ad_id=ad_id,
+        other=user,
+        messages=messages_list,
+        ad_id=ad_id
     )
 
 
-# ============================================================
-# ОБРАБОТЧИКИ ОШИБОК
-# ============================================================
+@app.route("/image/<int:ad_id>")
+def image(ad_id):
+    """Отображение изображения объявления."""
 
-@app.errorhandler(403)
-def error_403(error):
-    return render_template(
-        "error.html",
-        code=403,
-        message="Доступ запрещён.",
-    ), 403
+    ad = db.get_ad_details(ad_id)
+
+    if not ad:
+        return "Изображение не найдено", 404
+
+    image_url = ad[5]
+
+    if image_url and image_url.startswith(("http://", "https://")):
+        return redirect(image_url)
+
+    # Если изображение не указано, показываем заглушку
+    svg = """
+    <svg xmlns="http://www.w3.org/2000/svg"
+         width="400" height="250">
+        <rect width="100%" height="100%" fill="#eeeeee"/>
+        <text x="50%" y="50%"
+              text-anchor="middle"
+              dominant-baseline="middle"
+              fill="#777777"
+              font-size="20">
+            Нет изображения
+        </text>
+    </svg>
+    """
+
+    return Response(svg, mimetype="image/svg+xml")
 
 
 @app.errorhandler(404)
-def error_404(error):
-    return render_template(
-        "error.html",
-        code=404,
-        message="Запрашиваемая страница не найдена.",
-    ), 404
+def page_not_found(error):
+    """Страница ошибки 404."""
 
-
-@app.errorhandler(500)
-def error_500(error):
-    return render_template(
-        "error.html",
-        code=500,
-        message="Внутренняя ошибка сервера.",
-    ), 500
+    return render_template("404.html"), 404
 
 
 if __name__ == "__main__":
     app.run(
-        host=os.getenv("FLASK_HOST", "127.0.0.1"),
-        port=int(os.getenv("FLASK_PORT", "5000")),
-        debug=False,
+        host="127.0.0.1",
+        port=5000,
+        debug=True
     )

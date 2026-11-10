@@ -1,192 +1,99 @@
-import fdb
 import os
-import hashlib
-import random
-from faker import Faker
+import fdb
 
-# ============================================================
-#  НАСТРОЙКА ПУТИ К БАЗЕ
-# ============================================================
-DB_DIR  = "/opt/avito_db"
-DB_NAME = "AVITO.DB"
-DB_PATH = os.path.join(DB_DIR, DB_NAME)
 
-HOST     = "localhost"
-USER     = "sysdba"
+# Настройки подключения
+DB_PATH = "/opt/avito_db/AVITO.DB"
+HOST = "localhost"
+USER = "sysdba"
 PASSWORD = "masterkey"
-# ============================================================
-
-
-fake = Faker("ru_RU")
-Faker.seed(42)
-random.seed(42)
-
-NUM_USERS     = 20
-NUM_ADS       = 50
-NUM_FAVORITES = 40
-NUM_MESSAGES  = 80
-
-ROLES = ["user", "user", "user", "moderator", "admin"]
-
-CATEGORIES = [
-    ("Электроника",  "Телефоны, ноутбуки, планшеты и другая техника"),
-    ("Транспорт",    "Автомобили, мотоциклы, запчасти"),
-    ("Недвижимость", "Квартиры, дома, коммерческая недвижимость"),
-    ("Услуги",       "Ремонт, обучение, консультации и другие услуги"),
-    ("Работа",       "Вакансии и резюме"),
-    ("Личные вещи",  "Одежда, обувь, аксессуары"),
-]
-
-
-def fill_test_data(cursor):
-    """Заполняет таблицы тестовыми данными. ID генерируются автоматически."""
-
-    # ---------- users ----------
-    user_ids = []
-    for _ in range(NUM_USERS):
-        login = fake.unique.user_name()
-        pwd_hash = hashlib.sha256(fake.password().encode("utf-8")).hexdigest()
-        role = random.choice(ROLES)
-        cursor.execute(
-            "INSERT INTO users (login, password_hash, role) VALUES (?, ?, ?)",
-            (login, pwd_hash, role),
-        )
-        user_ids.append(cursor.lastrowid if hasattr(cursor, "lastrowid") else None)
-
-    # Firebird не отдаёт lastrowid — забираем id явно
-    cursor.execute("SELECT id FROM users ORDER BY id")
-    user_ids = [row[0] for row in cursor.fetchall()]
-
-    # ---------- categories ----------
-    for name, description in CATEGORIES:
-        cursor.execute(
-            "INSERT INTO categories (name, description) VALUES (?, ?)",
-            (name, description),
-        )
-    cursor.execute("SELECT id FROM categories ORDER BY id")
-    category_ids = [row[0] for row in cursor.fetchall()]
-
-    # ---------- ads (image_url = NULL — заглушка) ----------
-    for _ in range(NUM_ADS):
-        cursor.execute(
-            """INSERT INTO ads
-               (user_id, category_id, title, description, price, city, image_url)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (
-                random.choice(user_ids),
-                random.choice(category_ids),
-                fake.sentence(nb_words=4).rstrip(".").capitalize(),
-                fake.text(max_nb_chars=500),
-                round(float(fake.pydecimal(left_digits=6, right_digits=2, positive=True)), 2),
-                fake.city_name(),
-                None,
-            ),
-        )
-    cursor.execute("SELECT id FROM ads ORDER BY id")
-    ad_ids = [row[0] for row in cursor.fetchall()]
-
-    # ---------- favorites ----------
-    pairs = set()
-    while len(pairs) < NUM_FAVORITES:
-        pair = (random.choice(user_ids), random.choice(ad_ids))
-        if pair in pairs:
-            continue
-        pairs.add(pair)
-        cursor.execute(
-            "INSERT INTO favorites (user_id, ad_id) VALUES (?, ?)", pair
-        )
-
-    # ---------- messages ----------
-    for _ in range(NUM_MESSAGES):
-        sender_id = random.choice(user_ids)
-        receiver_id = random.choice(user_ids)
-        while receiver_id == sender_id:
-            receiver_id = random.choice(user_ids)
-        cursor.execute(
-            """INSERT INTO messages
-               (sender_id, receiver_id, ad_id, message_text, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (
-                sender_id,
-                receiver_id,
-                random.choice(ad_ids) if random.random() < 0.7 else None,
-                fake.text(max_nb_chars=300),
-                fake.date_time_between(start_date="-30d", end_date="now"),
-            ),
-        )
-
-    print(f"Пользователей: {len(user_ids)}")
-    print(f"Категорий:     {len(category_ids)}")
-    print(f"Объявлений:    {len(ad_ids)}")
-    print(f"Избранного:    {len(pairs)}")
-    print(f"Сообщений:     {NUM_MESSAGES}")
+CHARSET = "UTF8"
 
 
 def create_database():
-    os.makedirs(DB_DIR, exist_ok=True)
+    """Создание базы данных."""
 
-    for suffix in ("", ".env", ".tmp", ".log"):
-        candidate = DB_PATH + suffix
-        if os.path.exists(candidate):
-            print(f"Удаляем старый файл: {candidate}")
-            os.remove(candidate)
+    # Создаём папку для базы, если её ещё нет
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-    conn = None
-    cursor = None
+    # Не удаляем существующую базу
+    if os.path.exists(DB_PATH):
+        print("База данных уже существует.")
+        return
+
+    print("Создание базы данных...")
+
+    connection = fdb.create_database(
+        database=f"{HOST}:{DB_PATH}",
+        user=USER,
+        password=PASSWORD,
+        charset=CHARSET
+    )
+
+    cursor = connection.cursor()
+
     try:
-        conn = fdb.create_database(
-            database=f"{HOST}:{DB_PATH}",
-            user=USER, password=PASSWORD, charset="UTF8",
-        )
-        cursor = conn.cursor()
-        print("Файл базы данных успешно создан!")
-
-        # ВАЖНО: GENERATED BY DEFAULT AS IDENTITY — автоинкремент.
-        # Это и есть основное исправление регистрации: INSERT без id теперь работает.
-        cursor.execute('''
+        # Таблица пользователей
+        cursor.execute("""
             CREATE TABLE users (
                 id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-                login VARCHAR(50) UNIQUE NOT NULL,
+                login VARCHAR(50) NOT NULL UNIQUE,
                 password_hash VARCHAR(255) NOT NULL,
-                role VARCHAR(20) NOT NULL
+                role VARCHAR(20) DEFAULT 'user'
             )
-        ''')
+        """)
 
-        cursor.execute('''
+        # Таблица категорий
+        cursor.execute("""
             CREATE TABLE categories (
                 id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-                name VARCHAR(100) UNIQUE NOT NULL,
-                description VARCHAR(1000)
+                name VARCHAR(100) NOT NULL,
+                description VARCHAR(500)
             )
-        ''')
+        """)
 
-        cursor.execute('''
+        # Таблица объявлений
+        cursor.execute("""
             CREATE TABLE ads (
                 id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 category_id INTEGER NOT NULL,
-                title VARCHAR(255) NOT NULL,
+                title VARCHAR(200) NOT NULL,
                 description VARCHAR(2000),
                 price NUMERIC(12, 2) NOT NULL,
-                city VARCHAR(100) NOT NULL,
+                city VARCHAR(100),
                 image_url VARCHAR(500),
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-            )
-        ''')
 
-        cursor.execute('''
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (category_id)
+                    REFERENCES categories(id)
+            )
+        """)
+
+        # Таблица избранного
+        cursor.execute("""
             CREATE TABLE favorites (
                 id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 ad_id INTEGER NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (ad_id) REFERENCES ads(id) ON DELETE CASCADE,
-                UNIQUE (user_id, ad_id)
-            )
-        ''')
 
-        cursor.execute('''
+                UNIQUE (user_id, ad_id),
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (ad_id)
+                    REFERENCES ads(id)
+                    ON DELETE CASCADE
+            )
+        """)
+
+        # Таблица сообщений
+        cursor.execute("""
             CREATE TABLE messages (
                 id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                 sender_id INTEGER NOT NULL,
@@ -194,32 +101,53 @@ def create_database():
                 ad_id INTEGER,
                 message_text VARCHAR(2000) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (ad_id) REFERENCES ads(id) ON DELETE CASCADE
+
+                FOREIGN KEY (sender_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (receiver_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (ad_id)
+                    REFERENCES ads(id)
+                    ON DELETE SET NULL
             )
-        ''')
+        """)
 
-        conn.commit()
-        print("Все таблицы успешно созданы!")
+        # Добавляем основные категории
+        categories = [
+            ("Электроника", "Телефоны, компьютеры и техника"),
+            ("Одежда", "Одежда, обувь и аксессуары"),
+            ("Дом и сад", "Товары для дома и сада"),
+            ("Транспорт", "Автомобили и другие виды транспорта"),
+            ("Недвижимость", "Квартиры, дома и помещения"),
+            ("Хобби", "Спорт, отдых и увлечения"),
+            ("Другое", "Прочие товары")
+        ]
 
-        print("Заполнение тестовыми данными...")
-        fill_test_data(cursor)
-        conn.commit()
-        print(f"Готово: {DB_PATH}")
+        for category in categories:
+            cursor.execute(
+                """
+                INSERT INTO categories (name, description)
+                VALUES (?, ?)
+                """,
+                category
+            )
 
-    except fdb.DatabaseError as e:
-        if conn:
-            conn.rollback()
-        print(f"Ошибка базы данных: {e}")
-    except Exception as e:
-        print(f"Общая ошибка: {e}")
+        connection.commit()
+
+        print("База данных успешно создана.")
+        print("Таблицы и категории добавлены.")
+
+    except Exception as error:
+        connection.rollback()
+        print("Ошибка создания базы данных:", error)
+
     finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-        print("Соединение закрыто.")
+        cursor.close()
+        connection.close()
 
 
 if __name__ == "__main__":

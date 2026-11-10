@@ -1,78 +1,164 @@
-
 {% extends "base.html" %}
 
-{% block title %}Каталог объявлений{% endblock %}
-
 {% block content %}
-<h2>Все объявления</h2>
 
-<form method="GET" action="{{ url_for('index') }}" class="search-form">
-    <input
-        type="text"
-        name="q"
-        placeholder="Название или описание"
-        value="{{ search_query }}"
-    >
+<div class="container">
 
-    <input
-        type="text"
-        name="city"
-        placeholder="Город"
-        value="{{ selected_city }}"
-    >
+    <h1>Каталог объявлений</h1>
 
-    <select name="category_id">
-        <option value="">Все категории</option>
-        {% for category in categories %}
-            <option
-                value="{{ category[0] }}"
-                {% if selected_category == category[0] %}selected{% endif %}
+    <form method="GET" action="{{ url_for('index') }}">
+
+        <div>
+            <label for="q">Поиск:</label>
+            <input
+                type="text"
+                id="q"
+                name="q"
+                placeholder="Введите название или описание"
+                value="{{ search_query }}"
             >
-                {{ category[1] }}
-            </option>
-        {% endfor %}
-    </select>
+        </div>
 
-    <select name="sort">
-        <option value="date" {% if sort_by == 'date' %}selected{% endif %}>
-            Сначала новые
-        </option>
-        <option value="price_asc" {% if sort_by == 'price_asc' %}selected{% endif %}>
-            Сначала дешёвые
-        </option>
-        <option value="price_desc" {% if sort_by == 'price_desc' %}selected{% endif %}>
-            Сначала дорогие
-        </option>
-    </select>
+        <div>
+            <label for="category_id">Категория:</label>
 
-    <button type="submit">Найти</button>
-    <a href="{{ url_for('index') }}">Сбросить</a>
-</form>
+            <select name="category_id" id="category_id">
+                <option value="">Все категории</option>
 
-<div class="ads-list">
-    {% for ad in ads %}
-        <article class="ad-card">
-            <a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">
-                {% if ad[4] %}
-                    <img
-                        src="{{ url_for('image', ad_id=ad[0]) }}"
-                        alt="{{ ad[1] }}"
-                        width="180"
+                {% for category in categories %}
+                    <option
+                        value="{{ category[0] }}"
+                        {% if selected_category|string == category[0]|string %}
+                            selected
+                        {% endif %}
                     >
-                {% else %}
-                    <div class="no-image">Нет фотографии</div>
-                {% endif %}
+                        {{ category[1] }}
+                    </option>
+                {% endfor %}
 
-                <h3>{{ ad[1] }}</h3>
-            </a>
+            </select>
+        </div>
 
-            <p><strong>{{ ad[2] }} руб.</strong></p>
-            <p>Город: {{ ad[3] }}</p>
-            <p>Категория: {{ ad[5] }}</p>
-            <p>Продавец: {{ ad[6] }}</p>
-        </article>
+        <div>
+            <label for="city">Город:</label>
+
+            <select name="city" id="city">
+                <option value="">Все города</option>
+
+                {% for city in cities %}
+                    <option
+                        value="{{ city }}"
+                        {% if selected_city == city %}
+                            selected
+                        {% endif %}
+                    >
+                        {{ city }}
+                    </option>
+                {% endfor %}
+
+            </select>
+        </div>
+
+        <div>
+            <label for="sort">Сортировка:</label>
+
+            <select name="sort" id="sort">
+
+                <option
+                    value="date"
+                    {% if sort_by == "date" %}selected{% endif %}
+                >
+                    Сначала новые
+                </option>
+
+                <option
+                    value="price_asc"
+                    {% if sort_by == "price_asc" %}selected{% endif %}
+                >
+                    Сначала дешёвые
+                </option>
+
+                <option
+                    value="price_desc"
+                    {% if sort_by == "price_desc" %}selected{% endif %}
+                >
+                    Сначала дорогие
+                </option>
+
+            </select>
+        </div>
+
+        <button type="submit">Найти</button>
+
+        <a href="{{ url_for('index') }}">Сбросить фильтры</a>
+
+    </form>
+
+    <hr>
+
+    {% if ads %}
+
+        <div class="ads-list">
+
+            {% for ad in ads %}
+
+                <div class="ad-card">
+
+                    <h2>
+                        <a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">
+                            {{ ad[1] }}
+                        </a>
+                    </h2>
+
+                    <div class="ad-image">
+                        <a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">
+                            <img
+                                src="{{ url_for('image', ad_id=ad[0]) }}"
+                                alt="{{ ad[1] }}"
+                                width="200"
+                                height="150"
+                            >
+                        </a>
+                    </div>
+
+                    <p>
+                        <strong>Цена:</strong>
+                        {{ ad[2] }} руб.
+                    </p>
+
+                    <p>
+                        <strong>Город:</strong>
+                        {{ ad[3] }}
+                    </p>
+
+                    <p>
+                        <strong>Категория:</strong>
+                        {{ ad[5] }}
+                    </p>
+
+                    <p>
+                        <strong>Продавец:</strong>
+                        {{ ad[6] }}
+                    </p>
+
+                    <a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">
+                        Подробнее
+                    </a>
+
+                </div>
+
+                <hr>
+
+            {% endfor %}
+
+        </div>
+
     {% else %}
-        <p>Объявлений не найдено.</p>
-    {% endfor %}
+
+        <p>Объявления не найдены.</p>
+
+    {% endif %}
+
 </div>
+
 {% endblock %}
