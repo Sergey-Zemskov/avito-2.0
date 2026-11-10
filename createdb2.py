@@ -1,6 +1,5 @@
 import fdb
 import os
-import shutil
 import hashlib
 import random
 from faker import Faker
@@ -9,30 +8,19 @@ from faker import Faker
 #  НАСТРОЙКА ПУТИ К БАЗЕ
 # ============================================================
 # Укажите ЯВНО папку, в которой будет лежать файл базы данных.
-# Именно этой папке нужно будет выдать права пользователю Firebird.
+# Именно этой папке нужно выдать права пользователю Firebird.
 #
-# Пример для Linux:
+# Пример для Linux (RHEL):
 #
 #   sudo mkdir -p /opt/avito_db
-#   sudo chown -R firebird:firebird /opt/avito_db
-#   sudo chmod -R 775 /opt/avito_db
+#   sudo chown firebird:firebird /opt/avito_db
+#   sudo chmod 770 /opt/avito_db
 #
-# Пример для Windows — путь вида r"D:\AVITO_DB". Тогда права выдавать не нужно,
-# но папка должна быть доступна на запись пользователю сервиса Firebird.
-
-# Создаём каталог (пока от root)
-#sudo mkdir -p /opt/avito_db
-
-# Назначаем владельца и группу
-#sudo chown firebird:firebird /opt/avito_db
-
-# Права: владелец и группа могут читать/писать/входить.
-# Для каталога это стандартная рекомендация для Firebird (770)[reference:1].
-#sudo chmod 770 /opt/avito_db
-
-#sudo usermod -aG firebird "$USER"
+# ВАЖНО: папка /opt/avito_db должна принадлежать firebird.
+# Скрипт НЕ удаляет саму папку — только файл базы внутри неё,
+# поэтому прав на /opt вашему пользователю НЕ требуется.
 # ------------------------------------------------------------
-DB_DIR  = "/opt/avito_db"     # <-- ПАПКА с базой (сюда выдавать права)
+DB_DIR  = "/opt/avito_db"     # <-- ПАПКА с базой (владелец firebird)
 DB_NAME = "AVITO.DB"          # <-- ИМЯ файла базы
 DB_PATH = os.path.join(DB_DIR, DB_NAME)
 
@@ -48,24 +36,23 @@ PASSWORD = "masterkey"
 # Установка: pip install Faker
 # ------------------------------------------------------------
 fake = Faker("ru_RU")
-Faker.seed(42)     # фиксируем сид, чтобы данные были воспроизводимы
+Faker.seed(42)
 random.seed(42)
 
-NUM_USERS      = 20
-NUM_ADS        = 50
-NUM_FAVORITES  = 40
-NUM_MESSAGES   = 80
+NUM_USERS     = 20
+NUM_ADS       = 50
+NUM_FAVORITES = 40
+NUM_MESSAGES  = 80
 
 ROLES = ["user", "user", "user", "moderator", "admin"]
 
-# Базовые категории (по смыслу Avito), остальные (если нужно больше) добираются из Faker
 CATEGORIES = [
-    ("Электроника",   "Телефоны, ноутбуки, планшеты и другая техника"),
-    ("Транспорт",     "Автомобили, мотоциклы, запчасти"),
-    ("Недвижимость",  "Квартиры, дома, коммерческая недвижимость"),
-    ("Услуги",        "Ремонт, обучение, консультации и другие услуги"),
-    ("Работа",        "Вакансии и резюме"),
-    ("Личные вещи",   "Одежда, обувь, аксессуары"),
+    ("Электроника",  "Телефоны, ноутбуки, планшеты и другая техника"),
+    ("Транспорт",    "Автомобили, мотоциклы, запчасти"),
+    ("Недвижимость", "Квартиры, дома, коммерческая недвижимость"),
+    ("Услуги",       "Ремонт, обучение, консультации и другие услуги"),
+    ("Работа",       "Вакансии и резюме"),
+    ("Личные вещи",  "Одежда, обувь, аксессуары"),
 ]
 
 
@@ -86,8 +73,7 @@ def fill_test_data(cursor):
 
     # ---------- categories ----------
     category_ids = []
-    for cid in range(1, len(CATEGORIES) + 1):
-        name, description = CATEGORIES[cid - 1]
+    for cid, (name, description) in enumerate(CATEGORIES, start=1):
         cursor.execute(
             "INSERT INTO categories (id, name, description) VALUES (?, ?, ?)",
             (cid, name, description),
@@ -102,8 +88,8 @@ def fill_test_data(cursor):
         price       = round(
             float(fake.pydecimal(left_digits=6, right_digits=2, positive=True)), 2
         )
-        city        = fake.city_name()
-        image_url   = fake.image_url()
+        city      = fake.city_name()
+        image_url = fake.image_url()
         cursor.execute(
             """INSERT INTO ads
                (id, user_id, category_id, title, description, price, city, image_url)
@@ -123,7 +109,7 @@ def fill_test_data(cursor):
 
     # ---------- favorites ----------
     pairs = set()
-    fid   = 1
+    fid = 1
     attempts = 0
     max_attempts = NUM_FAVORITES * 20
     while len(pairs) < NUM_FAVORITES and attempts < max_attempts:
@@ -165,14 +151,25 @@ def fill_test_data(cursor):
 #  СОЗДАНИЕ БАЗЫ
 # ============================================================
 def create_database():
-    # Автоматическая очистка: удаляем старую папку с базой, если она есть
-    if os.path.exists(DB_DIR):
-        print(f"Удаляем старые файлы из {DB_DIR}...")
-        shutil.rmtree(DB_DIR)
-
-    # Создаём папку заново
+    # Создаём папку, если её ещё нет (например, при первом запуске от root).
+    # Если папка уже существует с владельцем firebird — ничего не меняется.
     os.makedirs(DB_DIR, exist_ok=True)
-    print(f"Папка для базы готова: {DB_DIR}")
+
+    # Удаляем ТОЛЬКО файл базы, а не всю папку.
+    # Так скрипту не нужны права на родительский каталог (/opt).
+    for suffix in ("", ".env", ".tmp", ".log"):
+        candidate = DB_PATH + suffix
+        if os.path.exists(candidate):
+            try:
+                print(f"Удаляем старый файл: {candidate}")
+                os.remove(candidate)
+            except PermissionError as e:
+                print(f"Не удалось удалить {candidate}: {e}")
+                print("Проверьте, что вы состоите в группе firebird:")
+                print("  groups | grep firebird")
+                print("И что папка доступна на запись:")
+                print(f"  ls -ld {DB_DIR}")
+                raise
 
     conn   = None
     cursor = None
