@@ -28,15 +28,10 @@ def login_required(f):
     return wrapper
 
 
+@app.context_processor
 def inject_user():
-    """Добавляет current_user во все шаблоны."""
     uid = current_user_id()
-    return {
-        "current_user": db.get_user_by_id(uid) if uid else None,
-    }
-
-
-app.context_processor(lambda: inject_user())
+    return {"current_user": db.get_user_by_id(uid) if uid else None}
 
 
 # ============================================================
@@ -282,15 +277,13 @@ def chat(other_id):
 # ============================================================
 @app.errorhandler(403)
 def err_403(_e):
-    return render_template("error.html",
-                           code=403,
+    return render_template("error.html", code=403,
                            message="Доступ запрещён"), 403
 
 
 @app.errorhandler(404)
 def err_404(_e):
-    return render_template("error.html",
-                           code=404,
+    return render_template("error.html", code=404,
                            message="Страница не найдена"), 404
 
 

@@ -1,27 +1,14 @@
 import fdb
 import os
-import hashlib
-import random
-from faker import Faker
+import sys
+import shutil
+import argparse
 
 # ============================================================
-#  НАСТРОЙКА ПУТИ К БАЗЕ
+#  ПУТЬ (ТОТ ЖЕ, ЧТО В db_functions.py И create_database.py)
 # ============================================================
-# Укажите ЯВНО папку, в которой будет лежать файл базы данных.
-# Именно этой папке нужно выдать права пользователю Firebird.
-#
-# Пример для Linux (RHEL):
-#
-#   sudo mkdir -p /opt/avito_db
-#   sudo chown firebird:firebird /opt/avito_db
-#   sudo chmod 770 /opt/avito_db
-#
-# ВАЖНО: папка /opt/avito_db должна принадлежать firebird.
-# Скрипт НЕ удаляет саму папку — только файл базы внутри неё,
-# поэтому прав на /opt вашему пользователю НЕ требуется.
-# ------------------------------------------------------------
-DB_DIR  = "/opt/avito_db"     # <-- ПАПКА с базой (владелец firebird)
-DB_NAME = "AVITO.DB"          # <-- ИМЯ файла базы
+DB_DIR  = "/opt/avito_db"
+DB_NAME = "AVITO.DB"
 DB_PATH = os.path.join(DB_DIR, DB_NAME)
 
 HOST     = "localhost"
@@ -30,247 +17,63 @@ PASSWORD = "masterkey"
 # ============================================================
 
 
-# ============================================================
-#  ГЕНЕРАТОР ТЕСТОВЫХ ДАННЫХ
-# ============================================================
-# Установка: pip install Faker
-# ------------------------------------------------------------
-fake = Faker("ru_RU")
-Faker.seed(42)
-random.seed(42)
+def drop_database(remove_dir: bool = False):
+    if not os.path.exists(DB_PATH):
+        print(f"Файла {DB_PATH} нет — удалять нечего.")
+    else:
+        # 1) Пробуем корректный drop через Firebird
+        conn = None
+        try:
+            conn = fdb.connect(
+                dsn=f"{HOST}:{DB_PATH}",
+                user=USER,
+                password=PASSWORD,
+                charset="UTF8",
+            )
+            # drop_database сам закрывает соединение на стороне сервера,
+            # поэтому conn.close() после него вызывать НЕЛЬЗЯ.
+            conn.drop_database()
+            conn = None  # соединение уже недействительно
+            print(f"База удалена через Firebird: {DB_PATH}")
+        except fdb.DatabaseError as e:
+            print(f"Firebird drop не удался: {e}")
+        except Exception as e:
+            print(f"Ошибка при подключении: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
-NUM_USERS     = 20
-NUM_ADS       = 50
-NUM_FAVORITES = 40
-NUM_MESSAGES  = 80
-
-ROLES = ["user", "user", "user", "moderator", "admin"]
-
-CATEGORIES = [
-    ("Электроника",  "Телефоны, ноутбуки, планшеты и другая техника"),
-    ("Транспорт",    "Автомобили, мотоциклы, запчасти"),
-    ("Недвижимость", "Квартиры, дома, коммерческая недвижимость"),
-    ("Услуги",       "Ремонт, обучение, консультации и другие услуги"),
-    ("Работа",       "Вакансии и резюме"),
-    ("Личные вещи",  "Одежда, обувь, аксессуары"),
-]
-
-
-def fill_test_data(cursor):
-    """Заполняет все таблицы случайными данными через Faker."""
-
-    # ---------- users ----------
-    user_ids = []
-    for uid in range(1, NUM_USERS + 1):
-        login         = fake.unique.user_name()
-        password_hash = hashlib.sha256(fake.password().encode("utf-8")).hexdigest()
-        role          = random.choice(ROLES)
-        cursor.execute(
-            "INSERT INTO users (id, login, password_hash, role) VALUES (?, ?, ?, ?)",
-            (uid, login, password_hash, role),
-        )
-        user_ids.append(uid)
-
-    # ---------- categories ----------
-    category_ids = []
-    for cid, (name, description) in enumerate(CATEGORIES, start=1):
-        cursor.execute(
-            "INSERT INTO categories (id, name, description) VALUES (?, ?, ?)",
-            (cid, name, description),
-        )
-        category_ids.append(cid)
-
-    # ---------- ads ----------
-    ad_ids = []
-    for aid in range(1, NUM_ADS + 1):
-        title       = fake.sentence(nb_words=4).rstrip(".").capitalize()
-        description = fake.text(max_nb_chars=500)
-        price       = round(
-            float(fake.pydecimal(left_digits=6, right_digits=2, positive=True)), 2
-        )
-        city      = fake.city_name()
-        image_url = fake.image_url()
-        cursor.execute(
-            """INSERT INTO ads
-               (id, user_id, category_id, title, description, price, city, image_url)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                aid,
-                random.choice(user_ids),
-                random.choice(category_ids),
-                title,
-                description,
-                price,
-                city,
-                image_url,
-            ),
-        )
-        ad_ids.append(aid)
-
-    # ---------- favorites ----------
-    pairs = set()
-    fid = 1
-    attempts = 0
-    max_attempts = NUM_FAVORITES * 20
-    while len(pairs) < NUM_FAVORITES and attempts < max_attempts:
-        attempts += 1
-        pair = (random.choice(user_ids), random.choice(ad_ids))
-        if pair in pairs:
-            continue
-        pairs.add(pair)
-        cursor.execute(
-            "INSERT INTO favorites (id, user_id, ad_id) VALUES (?, ?, ?)",
-            (fid, pair[0], pair[1]),
-        )
-        fid += 1
-
-    # ---------- messages ----------
-    for mid in range(1, NUM_MESSAGES + 1):
-        sender_id   = random.choice(user_ids)
-        receiver_id = random.choice(user_ids)
-        while receiver_id == sender_id and len(user_ids) > 1:
-            receiver_id = random.choice(user_ids)
-        ad_id      = random.choice(ad_ids) if random.random() < 0.7 else None
-        text       = fake.text(max_nb_chars=300)
-        created_at = fake.date_time_between(start_date="-30d", end_date="now")
-        cursor.execute(
-            """INSERT INTO messages
-               (id, sender_id, receiver_id, ad_id, message_text, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (mid, sender_id, receiver_id, ad_id, text, created_at),
-        )
-
-    print(f"Пользователей: {len(user_ids)}")
-    print(f"Категорий:     {len(category_ids)}")
-    print(f"Объявлений:    {len(ad_ids)}")
-    print(f"Избранного:    {len(pairs)}")
-    print(f"Сообщений:     {NUM_MESSAGES}")
-
-
-# ============================================================
-#  СОЗДАНИЕ БАЗЫ
-# ============================================================
-def create_database():
-    # Создаём папку, если её ещё нет (например, при первом запуске от root).
-    # Если папка уже существует с владельцем firebird — ничего не меняется.
-    os.makedirs(DB_DIR, exist_ok=True)
-
-    # Удаляем ТОЛЬКО файл базы, а не всю папку.
-    # Так скрипту не нужны права на родительский каталог (/opt).
-    for suffix in ("", ".env", ".tmp", ".log"):
-        candidate = DB_PATH + suffix
-        if os.path.exists(candidate):
+        # 2) Если файл всё ещё существует — удаляем напрямую
+        if os.path.exists(DB_PATH):
             try:
-                print(f"Удаляем старый файл: {candidate}")
-                os.remove(candidate)
+                os.remove(DB_PATH)
+                print(f"Файл удалён напрямую: {DB_PATH}")
             except PermissionError as e:
-                print(f"Не удалось удалить {candidate}: {e}")
-                print("Проверьте, что вы состоите в группе firebird:")
-                print("  groups | grep firebird")
-                print("И что папка доступна на запись:")
-                print(f"  ls -ld {DB_DIR}")
-                raise
+                print(f"Нет прав на удаление: {e}")
+                print("Выполните:")
+                print(f"  sudo -u firebird rm -f {DB_PATH}")
+                sys.exit(1)
+            except Exception as e:
+                print(f"Не удалось удалить файл: {e}")
+                sys.exit(1)
 
-    conn   = None
-    cursor = None
-    try:
-        # Подключаемся (файл создастся автоматически)
-        conn = fdb.create_database(
-            database=f"{HOST}:{DB_PATH}",
-            user=USER,
-            password=PASSWORD,
-            charset="UTF8",
-        )
-        cursor = conn.cursor()
-        print("Файл базы данных успешно создан!")
-
-        print("Создание пустых таблиц для ER-диаграммы...")
-
-        # 1. Пользователи
-        cursor.execute('''
-            CREATE TABLE users (
-                id INTEGER PRIMARY KEY,
-                login VARCHAR(50) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                role VARCHAR(20) NOT NULL
-            )
-        ''')
-
-        # 2. Категории
-        cursor.execute('''
-            CREATE TABLE categories (
-                id INTEGER PRIMARY KEY,
-                name VARCHAR(100) UNIQUE NOT NULL,
-                description VARCHAR(1000)
-            )
-        ''')
-
-        # 3. Объявления
-        cursor.execute('''
-            CREATE TABLE ads (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                category_id INTEGER NOT NULL,
-                title VARCHAR(255) NOT NULL,
-                description VARCHAR(2000),
-                price NUMERIC(12, 2) NOT NULL,
-                city VARCHAR(100) NOT NULL,
-                image_url VARCHAR(500),
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-            )
-        ''')
-
-        # 4. Избранное
-        cursor.execute('''
-            CREATE TABLE favorites (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                ad_id INTEGER NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (ad_id) REFERENCES ads(id) ON DELETE CASCADE,
-                UNIQUE (user_id, ad_id)
-            )
-        ''')
-
-        # 5. Сообщения (Чат)
-        cursor.execute('''
-            CREATE TABLE messages (
-                id INTEGER PRIMARY KEY,
-                sender_id INTEGER NOT NULL,
-                receiver_id INTEGER NOT NULL,
-                ad_id INTEGER,
-                message_text VARCHAR(2000) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (ad_id) REFERENCES ads(id) ON DELETE CASCADE
-            )
-        ''')
-
-        conn.commit()
-        print("Все таблицы успешно созданы!")
-
-        # ----- ЗАПОЛНЕНИЕ ТЕСТОВЫМИ ДАННЫМИ -----
-        print("Заполнение базы тестовыми данными через Faker...")
-        fill_test_data(cursor)
-        conn.commit()
-
-        print(f"Файл базы данных сохранен по пути: {DB_PATH}")
-
-    except fdb.DatabaseError as e:
-        if conn:
-            conn.rollback()
-        print(f"Ошибка базы данных: {e}")
-    except Exception as e:
-        print(f"Общая ошибка: {e}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-        print("Соединение закрыто.")
+    # 3) При желании — снести и сам каталог
+    if remove_dir and os.path.exists(DB_DIR):
+        try:
+            shutil.rmtree(DB_DIR)
+            print(f"Каталог удалён: {DB_DIR}")
+        except PermissionError:
+            print(f"Нет прав на удаление каталога {DB_DIR}.")
+            print(f"  sudo rm -rf {DB_DIR}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
-    create_database()
+    parser = argparse.ArgumentParser(description="Удаление базы AVITO")
+    parser.add_argument("--dir", action="store_true",
+                        help="Удалить также каталог /opt/avito_db")
+    args = parser.parse_args()
+    drop_database(remove_dir=args.dir)

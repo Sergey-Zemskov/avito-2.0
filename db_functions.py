@@ -1,10 +1,9 @@
 import fdb
 import os
 import hashlib
-from functools import wraps
 
 # ============================================================
-#  ЕДИНЫЙ ПУТЬ К БАЗЕ ДЛЯ ВСЕГО ПРОЕКТА
+#  ПУТЬ К БАЗЕ (тот же, что в create_database.py)
 # ============================================================
 DB_PATH = "/opt/avito_db/AVITO.DB"
 
