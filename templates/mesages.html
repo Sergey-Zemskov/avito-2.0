@@ -1,11 +1,22 @@
+
 {% extends "base.html" %}
+
+{% block title %}Сообщения{% endblock %}
+
 {% block content %}
-<h2>Диалоги</h2>
-<ul>
-    {% for c in chats %}
-    <li><a href="{{ url_for('chat', ad_id=c[0], other_id=c[1]) }}">Объявление #{{ c[0] }} (собеседник: {{ c[1] }})</a></li>
-    {% else %}
-    <li>У вас нет сообщений.</li>
-    {% endfor %}
-</ul>
+<h2>Мои переписки</h2>
+
+{% for conversation in conversations %}
+    <article class="conversation">
+        <h3>
+            <a href="{{ url_for('chat', other_id=conversation[0]) }}">
+                {{ conversation[1] }}
+            </a>
+        </h3>
+
+        <p>Последнее сообщение: {{ conversation[2] }}</p>
+    </article>
+{% else %}
+    <p>У вас пока нет переписок.</p>
+{% endfor %}
 {% endblock %}

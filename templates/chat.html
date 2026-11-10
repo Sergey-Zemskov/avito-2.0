@@ -1,15 +1,51 @@
+
 {% extends "base.html" %}
+
+{% block title %}Переписка с {{ other[1] }}{% endblock %}
+
 {% block content %}
-<h2>Чат с {{ other[1] }}</h2>
-<div style="border: 1px solid #000; padding: 10px; margin-bottom: 10px;">
-    {% for m in history %}
-        <p><b>{% if m[0] == current_user_id %}Вы{% else %}{{ other[1] }}{% endif %}:</b> {{ m[1] }}</p>
+<h2>Переписка с {{ other[1] }}</h2>
+
+{% if ad_id %}
+    <p>
+        Объявление:
+        <a href="{{ url_for('ad_detail', ad_id=ad_id) }}">
+            Открыть объявление
+        </a>
+    </p>
+{% endif %}
+
+<div class="chat-history">
+    {% for message in messages %}
+        <div class="message">
+            <p>
+                <strong>
+                    {% if message[1] == current_user_id %}
+                        Вы
+                    {% else %}
+                        {{ message[6] }}
+                    {% endif %}
+                </strong>
+            </p>
+
+            <p>{{ message[4] }}</p>
+            <small>{{ message[5] }}</small>
+        </div>
     {% else %}
-        <p>Сообщений нет.</p>
+        <p>Сообщений пока нет.</p>
     {% endfor %}
 </div>
+
 <form method="POST">
-    <input type="text" name="text" required placeholder="Ваше сообщение...">
+    <textarea
+        name="text"
+        maxlength="2000"
+        placeholder="Введите сообщение..."
+        required
+    ></textarea>
+
     <button type="submit">Отправить</button>
 </form>
+
+<a href="{{ url_for('messages_list') }}">Вернуться к перепискам</a>
 {% endblock %}

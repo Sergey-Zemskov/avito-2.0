@@ -1,29 +1,85 @@
+
 {% extends "base.html" %}
+
+{% block title %}
+    {% if ad %}Редактирование объявления{% else %}Новое объявление{% endif %}
+{% endblock %}
+
 {% block content %}
-<h2>{% if ad %}Редактировать{% else %}Добавить{% endif %} объявление</h2>
-<form method="POST" enctype="multipart/form-data">
-    <label>Название:</label>
-    <input type="text" name="title" value="{{ ad[1] if ad else '' }}" required>
-    
-    <label>Описание:</label>
-    <textarea name="description">{{ ad[2] if ad else '' }}</textarea>
-    
-    <label>Цена:</label>
-    <input type="number" step="0.01" name="price" value="{{ ad[3] if ad else '' }}" required>
-    
-    <label>Город:</label>
-    <input type="text" name="city" value="{{ ad[4] if ad else '' }}" required>
-    
-    <label>Категория:</label>
-    <select name="category_id" required>
-        {% for c in categories %}
-            <option value="{{ c[0] }}" {% if ad and ad[8] == c[0] %}selected{% endif %}>{{ c[1] }}</option>
+<h2>
+    {% if ad %}
+        Редактирование объявления
+    {% else %}
+        Создание объявления
+    {% endif %}
+</h2>
+
+<form method="POST">
+    <label for="title">Название товара:</label>
+    <input
+        id="title"
+        type="text"
+        name="title"
+        maxlength="255"
+        value="{{ ad[1] if ad else '' }}"
+        required
+    >
+
+    <label for="description">Описание:</label>
+    <textarea
+        id="description"
+        name="description"
+        maxlength="2000"
+        rows="6"
+    >{{ ad[2] if ad else '' }}</textarea>
+
+    <label for="price">Цена:</label>
+    <input
+        id="price"
+        type="number"
+        name="price"
+        min="0"
+        step="0.01"
+        value="{{ ad[3] if ad else '' }}"
+        required
+    >
+
+    <label for="city">Город:</label>
+    <input
+        id="city"
+        type="text"
+        name="city"
+        maxlength="100"
+        value="{{ ad[4] if ad else '' }}"
+        required
+    >
+
+    <label for="category_id">Категория:</label>
+    <select id="category_id" name="category_id" required>
+        <option value="">Выберите категорию</option>
+
+        {% for category in categories %}
+            <option
+                value="{{ category[0] }}"
+                {% if ad and ad[6] == category[0] %}selected{% endif %}
+            >
+                {{ category[1] }}
+            </option>
         {% endfor %}
     </select>
-    
-    <label>Фото (если не менять - оставьте пустым):</label>
-    <input type="file" name="image" accept="image/*">
-    
-    <button type="submit">Сохранить</button>
+
+    <label for="image_url">Ссылка на фотографию:</label>
+    <input
+        id="image_url"
+        type="url"
+        name="image_url"
+        maxlength="500"
+        value="{{ ad[5] if ad else '' }}"
+        placeholder="https://example.com/photo.jpg"
+    >
+
+    <button type="submit">
+        {% if ad %}Сохранить изменения{% else %}Создать объявление{% endif %}
+    </button>
 </form>
 {% endblock %}

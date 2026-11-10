@@ -1,0 +1,45 @@
+
+{% extends "base.html" %}
+
+{% block title %}Мой профиль{% endblock %}
+
+{% block content %}
+<h2>Мой профиль</h2>
+
+{% if user %}
+    <p><strong>Логин:</strong> {{ user[1] }}</p>
+    <p><strong>Роль:</strong> {{ user[2] }}</p>
+{% endif %}
+
+<h3>Мои объявления</h3>
+
+{% for ad in ads %}
+    <article class="ad-card">
+        <h4>
+            <a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">
+                {{ ad[1] }}
+            </a>
+        </h4>
+
+        <p>Цена: {{ ad[2] }} руб.</p>
+        <p>Город: {{ ad[3] }}</p>
+        <p>Категория: {{ ad[4] }}</p>
+
+        <a href="{{ url_for('ad_edit', ad_id=ad[0]) }}">
+            Редактировать
+        </a>
+
+        <form
+            method="POST"
+            action="{{ url_for('ad_delete', ad_id=ad[0]) }}"
+            onsubmit="return confirm('Удалить объявление?');"
+        >
+            <button type="submit">Удалить</button>
+        </form>
+    </article>
+{% else %}
+    <p>Вы пока не разместили ни одного объявления.</p>
+{% endfor %}
+
+<a href="{{ url_for('ad_create') }}">Разместить объявление</a>
+{% endblock %}

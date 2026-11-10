@@ -1,20 +1,27 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}Авито{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Портал объявлений{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <header>
-    <h1><a href="{{ url_for('index') }}">Авито</a></h1>
+    <h1><a href="{{ url_for('index') }}">Авито — портал объявлений</a></h1>
+
     <nav>
+        <a href="{{ url_for('index') }}">Главная</a>
+
         {% if current_user_id %}
-            <a href="{{ url_for('add_ad') }}">Добавить</a>
-            <a href="{{ url_for('my_ads') }}">Мои объявления</a>
+            <a href="{{ url_for('ad_create') }}">Добавить объявление</a>
+            <a href="{{ url_for('profile') }}">Мой профиль</a>
             <a href="{{ url_for('favorites') }}">Избранное</a>
-            <a href="{{ url_for('messages') }}">Сообщения</a>
-            <span>[ {{ current_login }} ] <a href="{{ url_for('logout') }}">Выйти</a></span>
+            <a href="{{ url_for('messages_list') }}">Сообщения</a>
+
+            <span>{{ current_login }}</span>
+            <a href="{{ url_for('logout') }}">Выйти</a>
         {% else %}
             <a href="{{ url_for('login') }}">Войти</a>
             <a href="{{ url_for('register') }}">Регистрация</a>
@@ -23,16 +30,23 @@
 </header>
 
 <main>
-    {% with msgs = get_flashed_messages() %}
-        {% if msgs %}
-            <ul class="flashes">
-                {% for m in msgs %}<li>{{ m }}</li>{% endfor %}
-            </ul>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
         {% endif %}
     {% endwith %}
+
     {% block content %}{% endblock %}
 </main>
 
-<footer><p>Курсовая работа. Авито, 2026 г.</p></footer>
+<footer>
+    <p>Курсовая работа. Разработка портала частных объявлений, 2026 г.</p>
+</footer>
 </body>
 </html>

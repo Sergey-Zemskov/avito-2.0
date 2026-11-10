@@ -1,18 +1,31 @@
+
 {% extends "base.html" %}
+
+{% block title %}Избранное{% endblock %}
+
 {% block content %}
-<h2>Избранное</h2>
-<table>
-    <tr><th>Название</th><th>Цена</th><th>Действия</th></tr>
-    {% for ad in ads %}
-    <tr>
-        <td><a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">{{ ad[1] }}</a></td>
-        <td>{{ ad[2] }} р.</td>
-        <td>
-            <form action="{{ url_for('fav_remove', ad_id=ad[0]) }}" method="POST">
-                <button type="submit">Убрать</button>
-            </form>
-        </td>
-    </tr>
-    {% else %}<tr><td colspan="3">В избранном пусто.</td></tr>{% endfor %}
-</table>
+<h2>Избранные объявления</h2>
+
+{% for ad in ads %}
+    <article class="ad-card">
+        <h3>
+            <a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">
+                {{ ad[1] }}
+            </a>
+        </h3>
+
+        <p>Цена: {{ ad[2] }} руб.</p>
+        <p>Город: {{ ad[3] }}</p>
+        <p>Категория: {{ ad[5] }}</p>
+
+        <form
+            method="POST"
+            action="{{ url_for('favorite_toggle', ad_id=ad[0]) }}"
+        >
+            <button type="submit">Убрать из избранного</button>
+        </form>
+    </article>
+{% else %}
+    <p>В избранном пока нет объявлений.</p>
+{% endfor %}
 {% endblock %}
