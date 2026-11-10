@@ -2,81 +2,43 @@
 
 {% block content %}
 
-<div class="container">
+<h2>Чат с {{ other[1] }}</h2>
 
-    <h1>Переписка</h1>
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 10px;">
 
-    <h3>
-        Собеседник: {{ other[1] }}
-    </h3>
+    {% for m in messages %}
 
-    <div class="chat-messages">
+        <p>
+            <b>
+                {% if m[1] == current_user_id %}
+                    Вы
+                {% else %}
+                    {{ other[1] }}
+                {% endif %}
+            </b>:
 
-        {% if messages %}
+            {{ m[4] }}
+        </p>
 
-            {% for m in messages %}
+    {% else %}
 
-                <div class="message">
+        <p>Сообщений нет.</p>
 
-                    {% if m[1] == current_user_id %}
-
-                        <p>
-                            <strong>Вы:</strong>
-                            {{ m[4] }}
-                        </p>
-
-                    {% else %}
-
-                        <p>
-                            <strong>{{ m[6] }}:</strong>
-                            {{ m[4] }}
-                        </p>
-
-                    {% endif %}
-
-                    <small>
-                        {{ m[5] }}
-                    </small>
-
-                </div>
-
-                <hr>
-
-            {% endfor %}
-
-        {% else %}
-
-            <p>Сообщений пока нет.</p>
-
-        {% endif %}
-
-    </div>
-
-    <form method="POST">
-
-        <div>
-            <label for="message">Ваше сообщение:</label>
-
-            <textarea
-                name="message"
-                id="message"
-                rows="3"
-                required
-            ></textarea>
-        </div>
-
-        <button type="submit">
-            Отправить
-        </button>
-
-    </form>
-
-    <p>
-        <a href="{{ url_for('messages') }}">
-            Вернуться к сообщениям
-        </a>
-    </p>
+    {% endfor %}
 
 </div>
+
+<form method="POST">
+
+    <input
+        type="text"
+        name="message"
+        required
+        placeholder="Ваше сообщение..."
+    >
+
+    <button type="submit">Отправить</button>
+
+</form>
 
 {% endblock %}
