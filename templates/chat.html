@@ -1,44 +1,16 @@
 {% extends "base.html" %}
-
+{% block title %}Чат с {{ other[1] }}{% endblock %}
 {% block content %}
-
 <h2>Чат с {{ other[1] }}</h2>
-
-<div style="border: 1px solid #000; padding: 10px; margin-bottom: 10px;">
-
+<div style="border:1px solid #000; padding:10px; margin-bottom:10px;">
     {% for m in messages %}
-
-        <p>
-            <b>
-                {% if m[1] == current_user_id %}
-                    Вы
-                {% else %}
-                    {{ other[1] }}
-                {% endif %}
-            </b>:
-
-            {{ m[4] }}
-        </p>
-
-    {% else %}
-
-        <p>Сообщений нет.</p>
-
-    {% endfor %}
-
+    <p><strong>{% if m[1] == current_user_id %}Вы{% else %}{{ other[1] }}{% endif %}</strong>
+    ({{ m[5] }}): {{ m[4] }}</p>
+    {% else %}<p>Сообщений пока нет.</p>{% endfor %}
 </div>
-
-<form method="POST">
-
-    <input
-        type="text"
-        name="message"
-        required
-        placeholder="Ваше сообщение..."
-    >
-
+<form method="POST" action="{{ url_for('chat', other_id=other[0], ad_id=ad_id) }}">
+    <input type="text" name="message" maxlength="2000" required placeholder="Ваше сообщение...">
     <button type="submit">Отправить</button>
-
 </form>
-
+<p><a href="{{ url_for('messages') }}">К списку переписок</a></p>
 {% endblock %}

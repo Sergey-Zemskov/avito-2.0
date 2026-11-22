@@ -1,54 +1,21 @@
-
 {% extends "base.html" %}
-
 {% block title %}Избранное{% endblock %}
-
 {% block content %}
-
 <h2>Избранные объявления</h2>
-
 {% if ads %}
-
-    <table border="1" cellpadding="8">
-        <tr>
-            <th>Название</th>
-            <th>Цена</th>
-            <th>Город</th>
-            <th>Категория</th>
-            <th>Действия</th>
-        </tr>
-
-        {% for ad in ads %}
-            <tr>
-                <td>
-                    <a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">
-                        {{ ad[1] }}
-                    </a>
-                </td>
-
-                <td>{{ ad[2] }} руб.</td>
-
-                <td>{{ ad[3] }}</td>
-
-                <td>{{ ad[5] }}</td>
-
-                <td>
-                    <a href="{{ url_for('favorite_toggle', ad_id=ad[0]) }}">
-                        Убрать из избранного
-                    </a>
-                </td>
-            </tr>
-        {% endfor %}
-    </table>
-
-{% else %}
-
-    <p>В избранном пока нет объявлений.</p>
-
-{% endif %}
-
-<p>
-    <a href="{{ url_for('index') }}">Вернуться к объявлениям</a>
-</p>
-
+<table border="1" cellpadding="8">
+    <tr><th>Название</th><th>Цена</th><th>Город</th><th>Категория</th><th>Действия</th></tr>
+    {% for ad in ads %}
+    <tr>
+        <td><a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">{{ ad[1] }}</a></td>
+        <td>{{ ad[2] }} руб.</td><td>{{ ad[3] }}</td><td>{{ ad[5] }}</td>
+        <td><form method="POST" action="{{ url_for('favorite_toggle', ad_id=ad[0]) }}">
+            <input type="hidden" name="next" value="{{ url_for('favorites') }}">
+            <button type="submit">Убрать из избранного</button>
+        </form></td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}<p>В избранном пока нет объявлений.</p>{% endif %}
+<p><a href="{{ url_for('index') }}">Вернуться к объявлениям</a></p>
 {% endblock %}

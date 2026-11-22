@@ -123,8 +123,8 @@ def fill_test_data(cursor):
             """
             INSERT INTO ads
                 (user_id, category_id, title, description,
-                 price, city, image_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                 price, city, image, image_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 random.choice(user_ids),
@@ -142,6 +142,7 @@ def fill_test_data(cursor):
                     2
                 ),
                 fake.city_name(),
+                None,
                 None
             )
         )
@@ -272,7 +273,8 @@ def create_database():
                 description VARCHAR(2000),
                 price NUMERIC(12, 2) NOT NULL,
                 city VARCHAR(100) NOT NULL,
-                image_url VARCHAR(500),
+                image BLOB SUB_TYPE BINARY,
+                image_type VARCHAR(100),
 
                 FOREIGN KEY (user_id)
                     REFERENCES users(id)
