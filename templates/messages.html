@@ -1,0 +1,45 @@
+
+{% extends "base.html" %}
+
+{% block title %}Мои сообщения{% endblock %}
+
+{% block content %}
+
+<div class="container">
+
+    <h2>Мои сообщения</h2>
+
+    {% if conversations %}
+
+        {% for conversation in conversations %}
+
+            <div class="message-card">
+
+                <h3>
+                    {{ conversation[1] }}
+                </h3>
+
+                <p>
+                    Последнее сообщение:
+                    {{ conversation[2] }}
+                </p>
+
+                <a href="{{ url_for('chat', other_id=conversation[0]) }}">
+                    Открыть переписку
+                </a>
+
+            </div>
+
+            <hr>
+
+        {% endfor %}
+
+    {% else %}
+
+        <p>У вас пока нет сообщений.</p>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}
