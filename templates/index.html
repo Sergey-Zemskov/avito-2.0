@@ -1,54 +1,7 @@
-{% extends "base.html" %}
-
-{% block title %}Все объявления{% endblock %}
-
-{% block content %}
-
-<h2>Все объявления</h2>
-
-<!-- форма поиска и фильтров -->
-<form method="GET" action="/" style="border: 1px solid black; padding: 10px; margin-bottom: 20px; background: #fafafa;">
-    Название: <input type="text" name="q" value="{{ search_query }}">
-    Город: <input type="text" name="city" value="{{ selected_city }}">
-
-    Категория:
-    <select name="category_id">
-        <option value="">Все</option>
-        {% for c in categories %}
-            <option value="{{ c[0] }}" {% if selected_category == c[0]|string %}selected{% endif %}>{{ c[1] }}</option>
-        {% endfor %}
-    </select>
-
-    Сортировка:
-    <select name="sort">
-        <option value="date" {% if sort_by == "date" %}selected{% endif %}>новые</option>
-        <option value="price_asc" {% if sort_by == "price_asc" %}selected{% endif %}>дешёвые</option>
-        <option value="price_desc" {% if sort_by == "price_desc" %}selected{% endif %}>дорогие</option>
-    </select>
-
-    <input type="submit" value="Найти">
-</form>
-
-<!-- таблица с объявлениями -->
-<table border="1" width="100%" cellpadding="5">
-    <tr style="background: #e0e0e0;">
-        <th>Название</th>
-        <th>Цена</th>
-        <th>Город</th>
-        <th>Продавец</th>
-    </tr>
-    {% for ad in ads %}
-    <tr>
-        <td><a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">{{ ad[1] }}</a></td>
-        <td>{{ ad[2] }} руб.</td>
-        <td>{{ ad[3] }}</td>
-        <td>{{ ad[6] }}</td>
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="4" align="center">Ничего не найдено.</td>
-    </tr>
-    {% endfor %}
-</table>
-
+{% extends "base.html" %}{% block title %}Объявления{% endblock %}{% block content %}
+<h1 class="page-title">Объявления рядом</h1>
+<form class="search-form" method="GET" action="/"><input name="q" placeholder="Что ищете?" value="{{ search_query }}"><input name="city" placeholder="Город" value="{{ selected_city }}">
+<select name="category_id"><option value="">Все категории</option>{% for c in categories %}<option value="{{ c[0] }}" {% if selected_category == c[0]|string %}selected{% endif %}>{{ c[1] }}</option>{% endfor %}</select>
+<select name="sort"><option value="date" {% if sort_by=='date' %}selected{% endif %}>Сначала новые</option><option value="price_asc" {% if sort_by=='price_asc' %}selected{% endif %}>Дешевле</option><option value="price_desc" {% if sort_by=='price_desc' %}selected{% endif %}>Дороже</option></select><button>Найти</button></form>
+<div class="ad-grid">{% for ad in ads %}<article class="ad-card"><a class="ad-photo" href="{{ url_for('ad_detail', ad_id=ad[0]) }}">{% if ad[4] %}<img src="{{ url_for('image', ad_id=ad[0]) }}" alt="Фото товара">{% else %}<span>Фото</span>{% endif %}</a><div class="ad-info"><a class="ad-title" href="{{ url_for('ad_detail', ad_id=ad[0]) }}">{{ ad[1] }}</a><div class="ad-price">{{ ad[2] }} ₽</div><div class="ad-meta">{{ ad[3] }} · {{ ad[6] }}</div></div></article>{% else %}<div class="panel">Объявлений пока нет. Попробуйте изменить поиск.</div>{% endfor %}</div>
 {% endblock %}

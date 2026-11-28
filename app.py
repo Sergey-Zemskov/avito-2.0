@@ -140,7 +140,7 @@ def ad_create():
         if result:
             flash("Объявление успешно создано.")
             return redirect(url_for("profile"))
-        flash("Не удалось создать объявление. Проверьте категорию и структуру базы данных.")
+        flash("Не удалось создать объявление. Подробная ошибка выведена в терминал.")
     return render_template("ad_form.html", ad=None, categories=categories)
 
 

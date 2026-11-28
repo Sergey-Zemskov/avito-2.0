@@ -180,8 +180,9 @@ def create_ad(user_id, category_id, title, description, price, city,
         )
         connection.commit()
         return True
-    except fdb.DatabaseError:
+    except fdb.DatabaseError as error:
         connection.rollback()
+        print("Ошибка создания объявления в Firebird:", error)
         return False
     finally:
         cursor.close()
@@ -358,27 +359,38 @@ def get_dialog(user_id, other_id, ad_id=None):
 
 
 def get_conversations(user_id):
+    """Список диалогов: отдельная переписка по каждому объявлению."""
     connection = get_connection()
     cursor = connection.cursor()
     try:
         cursor.execute(
             """
-            SELECT
-                CASE WHEN messages.sender_id = ? THEN messages.receiver_id ELSE messages.sender_id END AS other_user_id,
-                users.login,
-                MAX(messages.created_at) AS last_message
+            SELECT messages.sender_id, messages.receiver_id, messages.ad_id,
+                   messages.message_text, messages.created_at,
+                   sender.login, receiver.login, ads.title
             FROM messages
-            JOIN users ON users.id = CASE
-                WHEN messages.sender_id = ? THEN messages.receiver_id ELSE messages.sender_id END
+            JOIN users sender ON sender.id = messages.sender_id
+            JOIN users receiver ON receiver.id = messages.receiver_id
+            LEFT JOIN ads ON ads.id = messages.ad_id
             WHERE messages.sender_id = ? OR messages.receiver_id = ?
-            GROUP BY
-                CASE WHEN messages.sender_id = ? THEN messages.receiver_id ELSE messages.sender_id END,
-                users.login
-            ORDER BY last_message DESC
+            ORDER BY messages.created_at DESC, messages.id DESC
             """,
-            (user_id, user_id, user_id, user_id, user_id)
+            (user_id, user_id)
         )
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        conversations = []
+        seen = set()
+        for row in rows:
+            other_id = row[1] if row[0] == user_id else row[0]
+            ad_id = row[2]
+            key = (other_id, ad_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            other_login = row[6] if row[0] == user_id else row[5]
+            # Tuple: other user ID, login, ad ID, ad title, latest message, time
+            conversations.append((other_id, other_login, ad_id, row[7], row[3], row[4]))
+        return conversations
     finally:
         cursor.close()
         connection.close()
