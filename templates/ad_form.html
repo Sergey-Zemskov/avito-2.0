@@ -1,27 +1,44 @@
 {% extends "base.html" %}
-{% block title %}{% if ad %}Редактирование объявления{% else %}Создание объявления{% endif %}{% endblock %}
+
+{% block title %}{% if ad %}Редактирование объявления{% else %}Новое объявление{% endif %}{% endblock %}
+
 {% block content %}
-<h2>{% if ad %}Редактирование объявления{% else %}Создание объявления{% endif %}</h2>
-<form method="POST" enctype="multipart/form-data">
-    <p><label for="title">Название товара:</label><br>
-    <input id="title" type="text" name="title" maxlength="255" value="{{ ad[1] if ad else '' }}" required></p>
-    <p><label for="description">Описание:</label><br>
-    <textarea id="description" name="description" maxlength="2000" rows="6" required>{{ ad[2] if ad else '' }}</textarea></p>
-    <p><label for="price">Цена:</label><br>
-    <input id="price" type="number" name="price" min="0" step="0.01" value="{{ ad[3] if ad else '' }}" required></p>
-    <p><label for="city">Город:</label><br>
-    <input id="city" type="text" name="city" maxlength="100" value="{{ ad[4] if ad else '' }}" required></p>
-    <p><label for="category_id">Категория:</label><br>
-    <select id="category_id" name="category_id" required>
-        <option value="">Выберите категорию</option>
+
+<h2>{% if ad %}Редактирование объявления{% else %}Новое объявление{% endif %}</h2>
+
+<!-- форма создания и редактирования объявления -->
+<form method="POST" enctype="multipart/form-data" style="border: 1px solid black; padding: 10px; background: #fafafa;">
+    <p>Название:<br>
+    <input type="text" name="title" maxlength="255" value="{{ ad[1] if ad else '' }}" required></p>
+
+    <p>Описание:<br>
+    <textarea name="description" maxlength="2000" rows="6" required>{{ ad[2] if ad else '' }}</textarea></p>
+
+    <p>Цена (в рублях):<br>
+    <input type="number" name="price" min="0" step="0.01" value="{{ ad[3] if ad else '' }}" required></p>
+
+    <p>Город:<br>
+    <input type="text" name="city" maxlength="100" value="{{ ad[4] if ad else '' }}" required></p>
+
+    <p>Категория:<br>
+    <select name="category_id" required>
+        <option value="">-- выберите --</option>
         {% for category in categories %}
-        <option value="{{ category[0] }}" {% if ad and ad[6] == category[0] %}selected{% endif %}>{{ category[1] }}</option>
+            <option value="{{ category[0] }}" {% if ad and ad[6] == category[0] %}selected{% endif %}>{{ category[1] }}</option>
         {% endfor %}
     </select></p>
-    {% if ad and ad[5] %}<p>Текущая фотография:<br><img src="{{ url_for('image', ad_id=ad[0]) }}" alt="Фото объявления" style="max-width:250px;"></p>{% endif %}
-    <p><label for="image">Фотография (JPG, PNG, GIF или WEBP, до 5 МБ):</label><br>
-    <input id="image" type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp"></p>
-    {% if ad %}<p>Если не выбирать новый файл, старая фотография останется.</p>{% endif %}
-    <button type="submit">{% if ad %}Сохранить изменения{% else %}Создать объявление{% endif %}</button>
+
+    {% if ad and ad[5] %}
+        <p>Текущее фото:<br>
+        <img src="{{ url_for('image', ad_id=ad[0]) }}" alt="фото" style="max-width: 250px; border: 1px solid black;"></p>
+    {% endif %}
+
+    <p>Фото (JPG, PNG, GIF, WEBP; до 5 МБ):<br>
+    <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp"></p>
+
+    {% if ad %}<p><i>Если фото не выбирать, старое останется.</i></p>{% endif %}
+
+    <input type="submit" value="{% if ad %}Сохранить{% else %}Создать{% endif %}">
 </form>
+
 {% endblock %}

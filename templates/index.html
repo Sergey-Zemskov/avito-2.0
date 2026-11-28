@@ -1,106 +1,54 @@
 {% extends "base.html" %}
 
+{% block title %}Все объявления{% endblock %}
+
 {% block content %}
 
 <h2>Все объявления</h2>
 
-<form method="GET" action="/" class="search-form">
+<!-- форма поиска и фильтров -->
+<form method="GET" action="/" style="border: 1px solid black; padding: 10px; margin-bottom: 20px; background: #fafafa;">
+    Название: <input type="text" name="q" value="{{ search_query }}">
+    Город: <input type="text" name="city" value="{{ selected_city }}">
 
-    <input
-        type="text"
-        name="q"
-        placeholder="Название"
-        value="{{ search_query }}"
-    >
-
-    <input
-        type="text"
-        name="city"
-        placeholder="Город"
-        value="{{ selected_city }}"
-    >
-
+    Категория:
     <select name="category_id">
-
-        <option value="">Все категории</option>
-
+        <option value="">Все</option>
         {% for c in categories %}
-
-            <option
-                value="{{ c[0] }}"
-                {% if selected_category == c[0]|string %}selected{% endif %}
-            >
-                {{ c[1] }}
-            </option>
-
+            <option value="{{ c[0] }}" {% if selected_category == c[0]|string %}selected{% endif %}>{{ c[1] }}</option>
         {% endfor %}
-
     </select>
 
+    Сортировка:
     <select name="sort">
-
-        <option
-            value="date"
-            {% if sort_by == "date" %}selected{% endif %}
-        >
-            Сначала новые
-        </option>
-
-        <option
-            value="price_asc"
-            {% if sort_by == "price_asc" %}selected{% endif %}
-        >
-            Сначала дешёвые
-        </option>
-
-        <option
-            value="price_desc"
-            {% if sort_by == "price_desc" %}selected{% endif %}
-        >
-            Сначала дорогие
-        </option>
-
+        <option value="date" {% if sort_by == "date" %}selected{% endif %}>новые</option>
+        <option value="price_asc" {% if sort_by == "price_asc" %}selected{% endif %}>дешёвые</option>
+        <option value="price_desc" {% if sort_by == "price_desc" %}selected{% endif %}>дорогие</option>
     </select>
 
-    <button type="submit">Искать</button>
-
+    <input type="submit" value="Найти">
 </form>
 
-<table>
-
-    <tr>
+<!-- таблица с объявлениями -->
+<table border="1" width="100%" cellpadding="5">
+    <tr style="background: #e0e0e0;">
         <th>Название</th>
         <th>Цена</th>
         <th>Город</th>
         <th>Продавец</th>
     </tr>
-
     {% for ad in ads %}
-
     <tr>
-
-        <td>
-            <a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">
-                {{ ad[1] }}
-            </a>
-        </td>
-
-        <td>{{ ad[2] }} р.</td>
-
+        <td><a href="{{ url_for('ad_detail', ad_id=ad[0]) }}">{{ ad[1] }}</a></td>
+        <td>{{ ad[2] }} руб.</td>
         <td>{{ ad[3] }}</td>
-
         <td>{{ ad[6] }}</td>
-
     </tr>
-
     {% else %}
-
     <tr>
-        <td colspan="4">Объявлений нет.</td>
+        <td colspan="4" align="center">Ничего не найдено.</td>
     </tr>
-
     {% endfor %}
-
 </table>
 
 {% endblock %}

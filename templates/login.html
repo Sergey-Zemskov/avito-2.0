@@ -1,23 +1,17 @@
-
 {% extends "base.html" %}
 
 {% block title %}Вход{% endblock %}
 
 {% block content %}
-<h2>Авторизация</h2>
 
-<form method="POST" action="{{ url_for('login') }}">
-    <label for="login">Логин:</label>
-    <input id="login" type="text" name="login" required>
+<h2>Вход на сайт</h2>
 
-    <label for="password">Пароль:</label>
-    <input id="password" type="password" name="password" required>
-
-    <button type="submit">Войти</button>
+<form method="POST" action="{{ url_for('login') }}" style="border: 1px solid black; padding: 10px; background: #fafafa;">
+    <p>Логин:<br><input type="text" name="login" required></p>
+    <p>Пароль:<br><input type="password" name="password" required></p>
+    <input type="submit" value="Войти">
 </form>
 
-<p>
-    Нет аккаунта?
-    <a href="{{ url_for('register') }}">Зарегистрироваться</a>
-</p>
+<p>Ещё нет аккаунта? <a href="{{ url_for('register') }}">Зарегистрироваться</a></p>
+
 {% endblock %}

@@ -1,22 +1,35 @@
 {% extends "base.html" %}
+
 {% block title %}{{ ad[1] }}{% endblock %}
+
 {% block content %}
+
 <h2>{{ ad[1] }}</h2>
-<p><strong>Цена:</strong> {{ ad[3] }} руб.</p>
-<p><strong>Город:</strong> {{ ad[4] }}</p>
-<p><strong>Категория:</strong> {{ ad[7] }}</p>
-<p><strong>Продавец:</strong> {{ ad[9] }}</p>
-<p><strong>Описание:</strong></p><p>{{ ad[2] }}</p>
-{% if ad[5] %}<p><img src="{{ url_for('image', ad_id=ad[0]) }}" alt="Фото объявления" style="max-width:300px;"></p>{% endif %}
-<hr>
-{% if current_user_id and current_user_id != ad[8] %}
-<form method="POST" action="{{ url_for('favorite_toggle', ad_id=ad[0]) }}">
-    <input type="hidden" name="next" value="{{ url_for('ad_detail', ad_id=ad[0]) }}">
-    <button type="submit">{% if favorite %}Убрать из избранного{% else %}Добавить в избранное{% endif %}</button>
-</form>
-<p><a href="{{ url_for('chat', other_id=ad[8], ad_id=ad[0]) }}">Написать продавцу</a></p>
-{% elif current_user_id == ad[8] %}
-<p><a href="{{ url_for('ad_edit', ad_id=ad[0]) }}">Редактировать объявление</a></p>
+
+<table border="1" cellpadding="6">
+    <tr><td><b>Цена:</b></td><td>{{ ad[3] }} руб.</td></tr>
+    <tr><td><b>Город:</b></td><td>{{ ad[4] }}</td></tr>
+    <tr><td><b>Категория:</b></td><td>{{ ad[7] }}</td></tr>
+    <tr><td><b>Продавец:</b></td><td>{{ ad[9] }}</td></tr>
+    <tr><td><b>Описание:</b></td><td>{{ ad[2] }}</td></tr>
+</table>
+
+{% if ad[5] %}
+    <p><img src="{{ url_for('image', ad_id=ad[0]) }}" alt="фото" style="max-width: 300px; border: 1px solid black;"></p>
 {% endif %}
-<p><a href="{{ url_for('index') }}">Вернуться к объявлениям</a></p>
+
+<hr>
+
+{% if current_user_id and current_user_id != ad[8] %}
+    <form method="POST" action="{{ url_for('favorite_toggle', ad_id=ad[0]) }}" style="border: 1px solid black; padding: 10px; display: inline-block; background: #fafafa;">
+        <input type="hidden" name="next" value="{{ url_for('ad_detail', ad_id=ad[0]) }}">
+        <input type="submit" value="{% if favorite %}Убрать из избранного{% else %}В избранное{% endif %}">
+    </form>
+    <p><a href="{{ url_for('chat', other_id=ad[8], ad_id=ad[0]) }}">Написать продавцу</a></p>
+{% elif current_user_id == ad[8] %}
+    <p><a href="{{ url_for('ad_edit', ad_id=ad[0]) }}">Редактировать объявление</a></p>
+{% endif %}
+
+<p><a href="{{ url_for('index') }}">← Назад к списку</a></p>
+
 {% endblock %}

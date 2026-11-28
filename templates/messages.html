@@ -1,10 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Мои сообщения{% endblock %}
+
+{% block title %}Сообщения{% endblock %}
+
 {% block content %}
+
 <h2>Мои переписки</h2>
+
 {% if conversations %}
-<table border="1" cellpadding="8">
-    <tr><th>Собеседник</th><th>Последнее сообщение</th><th>Действие</th></tr>
+<table border="1" width="100%" cellpadding="5">
+    <tr style="background: #e0e0e0;">
+        <th>Собеседник</th>
+        <th>Последнее сообщение</th>
+        <th>Действие</th>
+    </tr>
     {% for conversation in conversations %}
     <tr>
         <td>{{ conversation[1] }}</td>
@@ -13,5 +21,10 @@
     </tr>
     {% endfor %}
 </table>
-{% else %}<p>У вас пока нет переписок.</p>{% endif %}
+{% else %}
+<p>Переписок пока нет.</p>
+{% endif %}
+
+<p><a href="{{ url_for('index') }}">← К объявлениям</a></p>
+
 {% endblock %}

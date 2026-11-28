@@ -1,36 +1,17 @@
-
 {% extends "base.html" %}
 
 {% block title %}Регистрация{% endblock %}
 
 {% block content %}
+
 <h2>Регистрация</h2>
 
-<form method="POST" action="{{ url_for('register') }}">
-    <label for="login">Логин:</label>
-    <input
-        id="login"
-        type="text"
-        name="login"
-        minlength="3"
-        maxlength="50"
-        required
-    >
-
-    <label for="password">Пароль:</label>
-    <input
-        id="password"
-        type="password"
-        name="password"
-        minlength="6"
-        required
-    >
-
-    <button type="submit">Зарегистрироваться</button>
+<form method="POST" action="{{ url_for('register') }}" style="border: 1px solid black; padding: 10px; background: #fafafa;">
+    <p>Логин (не короче 3 символов):<br><input type="text" name="login" minlength="3" maxlength="50" required></p>
+    <p>Пароль (не короче 6 символов):<br><input type="password" name="password" minlength="6" required></p>
+    <input type="submit" value="Зарегистрироваться">
 </form>
 
-<p>
-    Уже есть аккаунт?
-    <a href="{{ url_for('login') }}">Войти</a>
-</p>
+<p>Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти</a></p>
+
 {% endblock %}
